@@ -1,0 +1,107 @@
+import React, { useState } from 'react';
+import { supabase } from './supabaseClient';
+import { Loader2 } from 'lucide-react';
+import edpBg from './assets/EDP.JPG';
+
+const Login = ({ onLogin }) => {
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+
+    const handleLogin = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError(null);
+
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('username', username)
+                .eq('passwordhash', password)
+                .single();
+
+            if (error) {
+                if (error.code === 'PGRST116') {
+                    throw new Error('Invalid username or password');
+                }
+                throw error;
+            }
+
+            if (data) {
+                onLogin(data);
+            }
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-cover bg-center bg-no-repeat relative" style={{ backgroundImage: `url(${edpBg})` }}>
+            <div className="absolute inset-0 bg-slate-900/40"></div>
+            <div className="max-w-md w-full bg-white/95 backdrop-blur shadow-2xl rounded-2xl p-8 relative z-10 border border-white/20">
+                <div className="text-center mb-8">
+                    <div className="flex justify-center mb-4">
+                        <div className="w-24 h-24 rounded-full overflow-hidden shadow-lg border-4 border-white">
+                            <img src="/logo.jpg" alt="EDP Logo" className="w-full h-full object-cover" />
+                        </div>
+                    </div>
+                    <h1 className="text-3xl font-extrabold text-[#1a237e] uppercase tracking-wide">EDP ENGINEERING SERVICES</h1>
+                    <p className="text-[#d32f2f] font-bold text-lg mt-2 tracking-wider">Excellence - Dedication - Planning</p>
+                </div>
+
+                {error && (
+                    <div className="bg-red-50 text-red-600 p-3 rounded-md mb-6 text-sm">
+                        {error}
+                    </div>
+                )}
+
+                <form onSubmit={handleLogin} className="space-y-6">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Username</label>
+                        <input
+                            type="text"
+                            required
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            className="w-full px-4 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                            placeholder="Enter your username"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+                        <input
+                            type="password"
+                            required
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="w-full px-4 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                            placeholder="••••••••"
+                        />
+                    </div>
+
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center font-medium"
+                    >
+                        {loading ? (
+                            <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Logging in...
+                            </>
+                        ) : (
+                            'Login'
+                        )}
+                    </button>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+export default Login;
