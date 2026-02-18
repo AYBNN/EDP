@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Building2, UserCheck, Search, Plus, Pencil, Trash2, X, Menu, ChevronLeft, ChevronRight, Eye, Maximize2, Minimize2, Camera, User, Upload, LogOut } from 'lucide-react';
+import { Users, Building2, UserCheck, Search, Plus, Pencil, Trash2, X, Menu, ChevronLeft, ChevronRight, Eye, Maximize2, Minimize2, Camera, User, Upload, LogOut, ClipboardList } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import PrintableProfileView from './PrintableProfileView';
+import Inventory from './Inventory';
 
 const SignaturePad = ({ value, onChange, disabled = false }) => {
   const canvasRef = useRef(null);
@@ -324,6 +325,7 @@ const EmployeeDashboard = ({ user, onLogout }) => {
   // Delete Confirmation States
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [showSignOutModal, setShowSignOutModal] = useState(false);
   const [recentActivity, setRecentActivity] = useState([]);
 
   const totalEmployees = employees.length;
@@ -567,6 +569,31 @@ const EmployeeDashboard = ({ user, onLogout }) => {
 
           return {
             ...emp,
+            // UI expected camelCase properties
+            firstName: emp.first_name || '',
+            middleName: emp.middle_name || '',
+            lastName: emp.last_name || '',
+            profilePicture: emp.profile_picture || null,
+            contactNumber: emp.contact_number || '',
+            email: emp.email || '',
+            birthday: emp.birthday || '',
+            age: emp.age || '',
+            sex: emp.sex || '',
+            status: emp.status || 'Active',
+            hiredPosition: emp.hired_position || '',
+            positionApplied: emp.position_applied || '',
+            reportingDate: emp.reporting_date || '',
+            hiredDept: emp.hired_dept || '',
+            sssNo: emp.sss_no || '',
+            pagibigNo: emp.pagibig_no || '',
+            philhealthNo: emp.philhealth_no || '',
+            tinNo: emp.tin_no || '',
+            emergencyContact: {
+              name: emp.emergency_contact_name || '',
+              relationship: emp.emergency_contact_relationship || '',
+              address: emp.emergency_contact_address || '',
+              contactNumber: emp.emergency_contact_number || ''
+            },
             name,
             employeeIdNumber
           };
@@ -1415,7 +1442,7 @@ const EmployeeDashboard = ({ user, onLogout }) => {
         }
 
         .badge {
-          font-family: 'Space Mono', monospace;
+          font-family: 'Calibre';
           font-size: 0.75rem;
           letter-spacing: 0.5px;
         }
@@ -1456,23 +1483,35 @@ const EmployeeDashboard = ({ user, onLogout }) => {
         {/* Sidebar */}
         <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-white shadow-2xl transition-all duration-300 ease-in-out flex flex-col sticky top-0 h-screen z-10`}>
           <div className="p-6 border-b border-slate-100">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg overflow-hidden">
-                  <img src="/logo.jpg" alt="EDP Logo" className="w-full h-full object-cover" />
+            <div className={`flex items-center ${sidebarOpen ? 'justify-between' : 'justify-center'}`}>
+              {sidebarOpen && (
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg overflow-hidden shrink-0">
+                    <img src="/logo.jpg" alt="EDP Logo" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex items-center justify-between flex-1 ml-3">
+                    <span className="font-bold text-xl bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent leading-tight">
+                      EDP Engineering Services
+                    </span>
+                    <button
+                      onClick={() => setSidebarOpen(false)}
+                      className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600 ml-2"
+                      title="Hide Sidebar"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
-                {sidebarOpen && (
-                  <span className="font-bold text-xl bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                    EDP Engineering Services
-                  </span>
-                )}
-              </div>
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="lg:hidden p-2 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                <Menu className="w-5 h-5 text-slate-600" />
-              </button>
+              )}
+              {!sidebarOpen && (
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                  title="Show Sidebar"
+                >
+                  <Menu className="w-5 h-5 text-slate-600" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -1498,453 +1537,474 @@ const EmployeeDashboard = ({ user, onLogout }) => {
               <Users className={`w-5 h-5 ${sidebarOpen ? '' : 'mx-auto'}`} />
               {sidebarOpen && <span className="font-semibold">Employees</span>}
             </button>
+
             <button
-              onClick={handleLogout}
-              className="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-red-600 hover:bg-red-50 mt-auto"
+              onClick={() => setCurrentPage('inventory')}
+              className={`sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${currentPage === 'inventory'
+                ? 'active bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-600'
+                : 'text-slate-600 hover:bg-slate-50'
+                }`}
             >
-              <LogOut className={`w-5 h-5 ${sidebarOpen ? '' : 'mx-auto'}`} />
-              {sidebarOpen && <span className="font-semibold">Sign Out</span>}
+              <ClipboardList className={`w-5 h-5 ${sidebarOpen ? '' : 'mx-auto'}`} />
+              {sidebarOpen && <span className="font-semibold">Inventory</span>}
             </button>
           </nav>
+
+          <div className="p-4 border-t border-slate-100">
+            <button
+              onClick={() => setShowSignOutModal(true)}
+              className="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-red-600 hover:bg-red-50"
+            >
+              <LogOut className={`w-5 h-5 ${sidebarOpen ? '' : 'mx-auto'}`} />
+              {sidebarOpen && <span className="font-semibold">Logout</span>}
+            </button>
+          </div>
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto">
-          <div className="w-full p-4">
-            {currentPage === 'dashboard' && (
-              <div className="space-y-8">
-                <div className="card-enter">
-                  <h1 className="text-5xl font-bold bg-gradient-to-r from-slate-800 to-indigo-600 bg-clip-text text-transparent mb-2">
-                    Dashboard
-                  </h1>
-                  <p className="text-slate-500 text-lg">Welcome back! Here's your overview</p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="stat-card card-enter bg-white rounded-2xl p-8 shadow-xl hover-lift border border-slate-100" style={{ animationDelay: '0.1s' }}>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-slate-500 font-semibold mb-2 uppercase tracking-wider text-sm">Total Employees</p>
-                        <p className="text-5xl font-bold bg-gradient-to-br from-slate-800 to-indigo-600 bg-clip-text text-transparent">
-                          {totalEmployees}
-                        </p>
-                      </div>
-                      <div className="icon-wrapper w-14 h-14 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-2xl flex items-center justify-center shadow-lg">
-                        <Users className="w-7 h-7 text-white" />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="stat-card card-enter bg-white rounded-2xl p-8 shadow-xl hover-lift border border-slate-100" style={{ animationDelay: '0.2s' }}>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-slate-500 font-semibold mb-2 uppercase tracking-wider text-sm">Active Employees</p>
-                        <p className="text-5xl font-bold bg-gradient-to-br from-emerald-600 to-teal-600 bg-clip-text text-transparent">
-                          {activeEmployees}
-                        </p>
-                      </div>
-                      <div className="icon-wrapper w-14 h-14 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl flex items-center justify-center shadow-lg">
-                        <UserCheck className="w-7 h-7 text-white" />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="stat-card card-enter bg-white rounded-2xl p-8 shadow-xl hover-lift border border-slate-100" style={{ animationDelay: '0.3s' }}>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-slate-500 font-semibold mb-2 uppercase tracking-wider text-sm">Departments</p>
-                        <p className="text-5xl font-bold bg-gradient-to-br from-orange-600 to-pink-600 bg-clip-text text-transparent">
-                          {departments}
-                        </p>
-                      </div>
-                      <div className="icon-wrapper w-14 h-14 bg-gradient-to-br from-orange-400 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg">
-                        <Building2 className="w-7 h-7 text-white" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="card-enter bg-white rounded-2xl p-8 shadow-xl border border-slate-100" style={{ animationDelay: '0.4s' }}>
-                  <h2 className="text-2xl font-bold text-slate-800 mb-6">Recent Activity</h2>
-                  <div className="space-y-4">
-                    {recentActivity.length > 0 ? (
-                      recentActivity.map((activity, index) => (
-                        <div key={activity.id || index} className="activity-item flex items-start gap-4 p-4 rounded-xl hover:bg-slate-50 transition-all">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${activity.type === 'new' ? 'bg-emerald-100' :
-                            activity.type === 'update' ? 'bg-blue-100' :
-                              activity.type === 'delete' ? 'bg-red-100' :
-                                'bg-orange-100'
-                            }`}>
-                            {activity.type === 'new' && <UserCheck className="w-5 h-5 text-emerald-600" />}
-                            {activity.type === 'update' && <Pencil className="w-5 h-5 text-blue-600" />}
-                            {activity.type === 'delete' && <Trash2 className="w-5 h-5 text-red-600" />}
-                            {!['new', 'update', 'delete'].includes(activity.type) && <Users className="w-5 h-5 text-orange-600" />}
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-semibold text-slate-800">{activity.title}</p>
-                            <p className="text-slate-500 text-sm mt-1">{activity.description}</p>
-                          </div>
-                          <span className="text-slate-400 text-sm whitespace-nowrap">{formatRelativeTime(activity.created_at)}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-8">
-                        <p className="text-slate-400">No recent activity found.</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {currentPage === 'employees' && (
-              <div className="space-y-6">
-                <div className="flex flex-col gap-6">
-                  <div>
+        <main className="flex-1 overflow-auto bg-slate-50/50 p-8">
+          {currentPage === 'inventory' ? (
+            <Inventory />
+          ) : (
+            <div className="max-w-[1400px] mx-auto space-y-8">
+              {currentPage === 'dashboard' && (
+                <div className="space-y-8">
+                  <div className="card-enter">
                     <h1 className="text-5xl font-bold bg-gradient-to-r from-slate-800 to-indigo-600 bg-clip-text text-transparent mb-2">
-                      Employees
+                      Dashboard
                     </h1>
-                    <p className="text-slate-500 text-lg">Manage your team members</p>
-                  </div>
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 w-full">
-                    <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto flex-1">
-                      <div className="relative w-full md:w-56">
-                        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                        <input
-                          type="text"
-                          placeholder="Search employees..."
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          className="search-input w-full pl-12 pr-4 py-3 bg-white rounded-xl border-2 border-slate-200 focus:border-indigo-400 focus:outline-none text-slate-700 placeholder-slate-400"
-                        />
-                      </div>
-                      <div className="w-full md:w-56">
-                        <select
-                          value={selectedPosition}
-                          onChange={(e) => setSelectedPosition(e.target.value)}
-                          className="filter-select w-full px-4 py-3 bg-white rounded-xl border-2 border-slate-200 focus:border-indigo-400 focus:outline-none text-slate-700"
-                        >
-                          <option value="">All Positions</option>
-                          {uniquePositions.map((position) => (
-                            <option key={position} value={position}>
-                              {position}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => setShowAllColumns(!showAllColumns)}
-                        className="flex items-center gap-2 px-5 py-3 bg-slate-800 text-white rounded-xl font-semibold hover:bg-slate-700 transition-all shadow-lg whitespace-nowrap"
-                      >
-                        {showAllColumns ? (
-                          <>
-                            <Minimize2 className="w-5 h-5" />
-                            Show less
-                          </>
-                        ) : (
-                          <>
-                            <Maximize2 className="w-5 h-5" />
-                            Show more
-                          </>
-                        )}
-                      </button>
-                      <button
-                        onClick={handleOpenAddModal}
-                        className="btn-primary flex items-center justify-center gap-2 px-6 py-3 text-white rounded-xl font-semibold shadow-lg whitespace-nowrap"
-                      >
-                        <Plus className="w-5 h-5" />
-                        Add Employee
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100 flex flex-col">
-                  {/* Desktop Table */}
-                  <div className="hidden lg:block overflow-x-auto flex-1">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="bg-gradient-to-r from-slate-50 to-indigo-50 border-b-2 border-indigo-100">
-                          <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Emp. ID</th>
-                          <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Profile</th>
-                          <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Last Name</th>
-                          <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">First Name</th>
-                          <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Middle Name</th>
-                          <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Gender</th>
-                          <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Birthdate</th>
-                          <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Age</th>
-
-                          {showAllColumns && (
-                            <>
-                              <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Address</th>
-                              <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Contact</th>
-                              <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Email</th>
-                              <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Emergency Contact Person</th>
-                              <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Emergency Contact #</th>
-                            </>
-                          )}
-
-                          <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Date Hired</th>
-
-                          {showAllColumns && (
-                            <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Tenurity</th>
-                          )}
-
-                          <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Designation</th>
-
-                          {showAllColumns && (
-                            <>
-                              <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">SSS No.</th>
-                              <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Pag-ibig No.</th>
-                              <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">PhilHealth No.</th>
-                              <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Tin No.</th>
-                              <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Department</th>
-                              <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Status</th>
-                            </>
-                          )}
-
-                          <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {currentItems.map((employee) => (
-                          <tr key={employee.id} className="table-row">
-                            <td className="px-3 py-4 whitespace-nowrap">
-                              <span className="badge font-bold text-slate-700 text-[13px]">{employee.employee_id || '(No ID)'}</span>
-                            </td>
-                            <td className="px-3 py-4 whitespace-nowrap">
-                              <div
-                                className="w-20 h-20 rounded-[5px] bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-indigo-400 transition-all shadow-sm"
-                                onClick={() => employee.profile_picture && setExpandedImage(employee.profile_picture)}
-                              >
-                                {employee.profile_picture ? (
-                                  <img src={employee.profile_picture} className="w-full h-full object-cover" alt="" />
-                                ) : (
-                                  <User className="w-10 h-10 text-slate-400" />
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-3 py-4 whitespace-nowrap">
-                              <span className="font-semibold text-slate-800 text-[13px]">{employee.last_name || '-'}</span>
-                            </td>
-                            <td className="px-3 py-4 whitespace-nowrap">
-                              <span className="font-semibold text-slate-800 text-[13px]">{employee.first_name || '-'}</span>
-                            </td>
-                            <td className="px-3 py-4 whitespace-nowrap">
-                              <span className="font-semibold text-slate-800 text-[13px]">{employee.middle_name || '-'}</span>
-                            </td>
-                            <td className="px-3 py-4 whitespace-nowrap">
-                              <span className="text-slate-600 text-[13px]">{employee.sex || '-'}</span>
-                            </td>
-                            <td className="px-3 py-4 whitespace-nowrap">
-                              <span className="text-slate-500 text-[13px]">
-                                {employee.birthday ? new Date(employee.birthday).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
-                              </span>
-                            </td>
-                            <td className="px-3 py-4 whitespace-nowrap">
-                              <span className="text-slate-600 text-[13px]">{employee.age || '-'}</span>
-                            </td>
-
-                            {showAllColumns && (
-                              <>
-                                <td className="px-3 py-4 max-w-[150px] truncate">
-                                  <span
-                                    className="text-slate-600 text-[13px] cursor-help"
-                                    title={`${employee.street ? employee.street + ', ' : ''}${employee.barangay ? employee.barangay + ', ' : ''}${employee.city ? employee.city + ', ' : ''}${employee.province || ''}`}
-                                  >
-                                    {employee.city}{employee.city && employee.province ? ', ' : ''}{employee.province}
-                                  </span>
-                                </td>
-                                <td className="px-3 py-4 whitespace-nowrap">
-                                  <span className="text-slate-600 text-[13px] font-medium">{employee.contact_number || '-'}</span>
-                                </td>
-                                <td className="px-3 py-4 whitespace-nowrap">
-                                  <span className="text-slate-600 text-[13px] font-medium">{employee.email || '-'}</span>
-                                </td>
-                                <td className="px-3 py-4 whitespace-nowrap">
-                                  <span className="text-slate-600 text-[13px] font-medium">{employee.emergency_contact_name || '-'}</span>
-                                </td>
-                                <td className="px-3 py-4 whitespace-nowrap">
-                                  <span className="text-slate-600 text-[13px] font-medium">{employee.emergency_contact_number || '-'}</span>
-                                </td>
-                              </>
-                            )}
-
-                            <td className="px-3 py-4 whitespace-nowrap">
-                              <span className="text-slate-600 text-[13px]">
-                                {employee.reporting_date ? new Date(employee.reporting_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
-                              </span>
-                            </td>
-
-                            {showAllColumns && (
-                              <td className="px-3 py-4 whitespace-nowrap">
-                                <span className="text-slate-600 text-[13px] font-medium">{calculateTenure(employee.reporting_date)}</span>
-                              </td>
-                            )}
-
-                            <td className="px-3 py-4">
-                              <span className="text-slate-600 text-[13px]">{employee.hired_position || employee.position || '-'}</span>
-                            </td>
-
-                            {showAllColumns && (
-                              <>
-                                <td className="px-3 py-4 whitespace-nowrap">
-                                  <span className="text-slate-600 text-[13px]">{employee.sss_no || '-'}</span>
-                                </td>
-                                <td className="px-3 py-4 whitespace-nowrap">
-                                  <span className="text-slate-600 text-[13px]">{employee.pagibig_no || '-'}</span>
-                                </td>
-                                <td className="px-3 py-4 whitespace-nowrap">
-                                  <span className="text-slate-600 text-[13px]">{employee.philhealth_no || '-'}</span>
-                                </td>
-                                <td className="px-3 py-4 whitespace-nowrap">
-                                  <span className="text-slate-600 text-[13px]">{employee.tin_no || '-'}</span>
-                                </td>
-                                <td className="px-3 py-4 whitespace-nowrap">
-                                  <span className="text-slate-600 text-[13px]">{employee.hired_dept || employee.department || '-'}</span>
-                                </td>
-                                <td className="px-3 py-4 whitespace-nowrap">
-                                  <span className={`badge px-3 py-1 rounded-full text-[13px] ${employee.status === 'Active'
-                                    ? 'bg-emerald-100 text-emerald-700'
-                                    : 'bg-slate-100 text-slate-600'
-                                    }`}>
-                                    {employee.status}
-                                  </span>
-                                </td>
-                              </>
-                            )}
-
-                            <td className="px-3 py-4 whitespace-nowrap">
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => handleEditEmployee(employee)}
-                                  className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
-                                  title="Edit"
-                                >
-                                  <Pencil className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleViewEmployee(employee)}
-                                  className="p-2 text-slate-600 hover:bg-slate-50 rounded-lg transition-all"
-                                  title="View Details"
-                                >
-                                  <Eye className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteEmployee(employee.id)}
-                                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <p className="text-slate-500 text-lg">Welcome back! Here's your overview</p>
                   </div>
 
-                  {/* Mobile Cards */}
-                  <div className="lg:hidden divide-y divide-slate-100">
-                    {currentItems.map((employee) => (
-                      <div key={employee.id} className="p-6 hover:bg-slate-50 transition-all">
-                        <div className="flex items-start gap-4 mb-4">
-                          <div
-                            className="w-20 h-20 rounded-[5px] bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center flex-shrink-0 cursor-pointer shadow-sm"
-                            onClick={() => employee.profile_picture && setExpandedImage(employee.profile_picture)}
-                          >
-                            {employee.profile_picture ? (
-                              <img src={employee.profile_picture} className="w-full h-full object-cover" alt="" />
-                            ) : (
-                              <User className="w-10 h-10 text-slate-400" />
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <span className="badge font-bold text-slate-600 block mb-1">{employee.employee_id || employee.id}</span>
-                            <h3 className="font-bold text-lg text-slate-800">{employee.name}</h3>
-                          </div>
-                          <span className={`badge px-3 py-1 rounded-full ${employee.status === 'Active'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-slate-100 text-slate-600'
-                            }`}>
-                            {employee.status}
-                          </span>
-                        </div>
-                        <div className="space-y-2 mb-4">
-                          <p className="text-slate-600"><span className="font-semibold">Position:</span> {employee.hired_position || employee.position || '-'}</p>
-                          <p className="text-slate-600">
-                            <span className="font-semibold">Date Hired:</span> {employee.reporting_date ? new Date(employee.reporting_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="stat-card card-enter bg-white rounded-2xl p-8 shadow-xl hover-lift border border-slate-100" style={{ animationDelay: '0.1s' }}>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-slate-500 font-semibold mb-2 uppercase tracking-wider text-sm">Total Employees</p>
+                          <p className="text-5xl font-bold bg-gradient-to-br from-slate-800 to-indigo-600 bg-clip-text text-transparent">
+                            {totalEmployees}
                           </p>
-                          <p className="text-slate-600"><span className="font-semibold">Department:</span> {employee.hired_dept || employee.department || '-'}</p>
-                          <p className="text-slate-500 text-sm">{employee.email}</p>
                         </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleEditEmployee(employee)}
-                            className="flex-1 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg font-semibold hover:bg-indigo-100 transition-all flex items-center justify-center gap-2"
-                          >
-                            <Pencil className="w-4 h-4" />
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleViewEmployee(employee)}
-                            className="flex-1 px-4 py-2 bg-slate-50 text-slate-600 rounded-lg font-semibold hover:bg-slate-100 transition-all flex items-center justify-center gap-2"
-                          >
-                            <Eye className="w-4 h-4" />
-                            View
-                          </button>
-                          <button
-                            onClick={() => handleDeleteEmployee(employee.id)}
-                            className="flex-1 px-4 py-2 bg-red-50 text-red-600 rounded-lg font-semibold hover:bg-red-100 transition-all flex items-center justify-center gap-2"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            Delete
-                          </button>
+                        <div className="icon-wrapper w-14 h-14 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-2xl flex items-center justify-center shadow-lg">
+                          <Users className="w-7 h-7 text-white" />
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    </div>
 
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 items-center gap-4">
-                  <p className="text-sm text-slate-500 text-center md:text-left">
-                    Showing <span className="font-bold">{indexOfFirstItem + 1}</span> to <span className="font-bold">{Math.min(indexOfLastItem, filteredEmployees.length)}</span> of <span className="font-bold">{filteredEmployees.length}</span> results
-                  </p>
-                  <div className="flex items-center justify-center gap-2">
-                    <button
-                      onClick={() => setCurrentTablePage(prev => Math.max(prev - 1, 1))}
-                      disabled={currentTablePage === 1}
-                      className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                    >
-                      <ChevronLeft className="w-5 h-5 text-slate-600" />
-                    </button>
-                    {Array.from({ length: totalPages }, (_, i) => (
-                      <button
-                        key={i + 1}
-                        onClick={() => paginate(i + 1)}
-                        className={`w-10 h-10 rounded-lg font-semibold transition-all ${currentTablePage === i + 1
-                          ? 'bg-indigo-600 text-white shadow-lg'
-                          : 'text-slate-600 hover:bg-slate-50'
-                          }`}
-                      >
-                        {i + 1}
-                      </button>
-                    ))}
-                    <button
-                      onClick={() => setCurrentTablePage(prev => Math.min(prev + 1, totalPages))}
-                      disabled={currentTablePage === totalPages}
-                      className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                    >
-                      <ChevronRight className="w-5 h-5 text-slate-600" />
-                    </button>
+                    <div className="stat-card card-enter bg-white rounded-2xl p-8 shadow-xl hover-lift border border-slate-100" style={{ animationDelay: '0.2s' }}>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-slate-500 font-semibold mb-2 uppercase tracking-wider text-sm">Active Employees</p>
+                          <p className="text-5xl font-bold bg-gradient-to-br from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+                            {activeEmployees}
+                          </p>
+                        </div>
+                        <div className="icon-wrapper w-14 h-14 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl flex items-center justify-center shadow-lg">
+                          <UserCheck className="w-7 h-7 text-white" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="stat-card card-enter bg-white rounded-2xl p-8 shadow-xl hover-lift border border-slate-100" style={{ animationDelay: '0.3s' }}>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-slate-500 font-semibold mb-2 uppercase tracking-wider text-sm">Departments</p>
+                          <p className="text-5xl font-bold bg-gradient-to-br from-orange-600 to-pink-600 bg-clip-text text-transparent">
+                            {departments}
+                          </p>
+                        </div>
+                        <div className="icon-wrapper w-14 h-14 bg-gradient-to-br from-orange-400 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg">
+                          <Building2 className="w-7 h-7 text-white" />
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="hidden md:block"></div>
+
+                  <div className="card-enter bg-white rounded-2xl p-8 shadow-xl border border-slate-100" style={{ animationDelay: '0.4s' }}>
+                    <h2 className="text-2xl font-bold text-slate-800 mb-6">Recent Activity</h2>
+                    <div className="space-y-4">
+                      {recentActivity.length > 0 ? (
+                        recentActivity.map((activity, index) => (
+                          <div key={activity.id || index} className="activity-item flex items-start gap-4 p-4 rounded-xl hover:bg-slate-50 transition-all">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${activity.type === 'new' ? 'bg-emerald-100' :
+                              activity.type === 'update' ? 'bg-blue-100' :
+                                activity.type === 'delete' ? 'bg-red-100' :
+                                  'bg-orange-100'
+                              }`}>
+                              {activity.type === 'new' && <UserCheck className="w-5 h-5 text-emerald-600" />}
+                              {activity.type === 'update' && <Pencil className="w-5 h-5 text-blue-600" />}
+                              {activity.type === 'delete' && <Trash2 className="w-5 h-5 text-red-600" />}
+                              {!['new', 'update', 'delete'].includes(activity.type) && <Users className="w-5 h-5 text-orange-600" />}
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-semibold text-slate-800">{activity.title}</p>
+                              <p className="text-slate-500 text-sm mt-1">{activity.description}</p>
+                            </div>
+                            <span className="text-slate-400 text-sm whitespace-nowrap">{formatRelativeTime(activity.created_at)}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8">
+                          <p className="text-slate-400">No recent activity found.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+
+              {currentPage === 'employees' && (
+                <div className="space-y-6">
+                  <div className="flex flex-col gap-6">
+                    <div>
+                      <h1 className="text-5xl font-bold bg-gradient-to-r from-slate-800 to-indigo-600 bg-clip-text text-transparent mb-2">
+                        Employees
+                      </h1>
+                      <p className="text-slate-500 text-lg">Manage your team members</p>
+                    </div>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 w-full">
+                      <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto flex-1">
+                        <div className="relative w-full md:w-56">
+                          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                          <input
+                            type="text"
+                            placeholder="Search employees..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="search-input w-full pl-12 pr-4 py-3 bg-white rounded-xl border-2 border-slate-200 focus:border-indigo-400 focus:outline-none text-slate-700 placeholder-slate-400"
+                          />
+                        </div>
+                        <div className="w-full md:w-56">
+                          <select
+                            value={selectedPosition}
+                            onChange={(e) => setSelectedPosition(e.target.value)}
+                            className="filter-select w-full px-4 py-3 bg-white rounded-xl border-2 border-slate-200 focus:border-indigo-400 focus:outline-none text-slate-700"
+                          >
+                            <option value="">All Positions</option>
+                            {uniquePositions.map((position) => (
+                              <option key={position} value={position}>
+                                {position}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setShowAllColumns(!showAllColumns)}
+                          className="flex items-center gap-2 px-5 py-3 bg-slate-800 text-white rounded-xl font-semibold hover:bg-slate-700 transition-all shadow-lg whitespace-nowrap"
+                        >
+                          {showAllColumns ? (
+                            <>
+                              <Minimize2 className="w-5 h-5" />
+                              Show less
+                            </>
+                          ) : (
+                            <>
+                              <Maximize2 className="w-5 h-5" />
+                              Show more
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={handleOpenAddModal}
+                          className="btn-primary flex items-center justify-center gap-2 px-6 py-3 text-white rounded-xl font-semibold shadow-lg whitespace-nowrap"
+                        >
+                          <Plus className="w-5 h-5" />
+                          Add Employee
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100 flex flex-col">
+                    {/* Desktop Table */}
+                    <div className="hidden lg:block overflow-x-auto flex-1">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="bg-gradient-to-r from-slate-50 to-indigo-50 border-b-2 border-indigo-100">
+                            <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Emp. ID</th>
+                            <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Profile</th>
+                            <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Last Name</th>
+                            <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">First Name</th>
+                            <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Middle Name</th>
+                            <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Gender</th>
+                            <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Birthdate</th>
+                            <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Age</th>
+
+                            {showAllColumns && (
+                              <>
+                                <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Address</th>
+                                <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Contact</th>
+                                <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Email</th>
+                                <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Emergency Contact Person</th>
+                                <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Emergency Contact #</th>
+                              </>
+                            )}
+
+                            <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Date Hired</th>
+
+                            {showAllColumns && (
+                              <>
+                                <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Tenurity</th>
+                                <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Designation</th>
+                              </>
+                            )}
+
+
+                            {showAllColumns && (
+                              <>
+                                <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">SSS No.</th>
+                                <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Pag-ibig No.</th>
+                                <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">PhilHealth No.</th>
+                                <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Tin No.</th>
+                                <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Department</th>
+                                <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Status</th>
+                              </>
+                            )}
+
+                            <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {currentItems.map((employee) => (
+                            <tr key={employee.id} className="table-row">
+                              <td className="px-3 py-4 whitespace-nowrap">
+                                <span className="badge font-bold text-slate-700 text-[13px]">{employee.employeeIdNumber || '(No ID)'}</span>
+                              </td>
+                              <td className="px-3 py-4 whitespace-nowrap">
+                                <div
+                                  className="w-20 h-20 rounded-[5px] bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-indigo-400 transition-all shadow-sm"
+                                  onClick={() => employee.profilePicture && setExpandedImage(employee.profilePicture)}
+                                >
+                                  {employee.profilePicture ? (
+                                    <img src={employee.profilePicture} className="w-full h-full object-cover" alt="" />
+                                  ) : (
+                                    <User className="w-10 h-10 text-slate-400" />
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-3 py-4 whitespace-nowrap">
+                                <span className="font-semibold text-slate-800 text-[13px]">{employee.lastName || '-'}</span>
+                              </td>
+                              <td className="px-3 py-4 whitespace-nowrap">
+                                <span className="font-semibold text-slate-800 text-[13px]">{employee.firstName || '-'}</span>
+                              </td>
+                              <td className="px-3 py-4 whitespace-nowrap">
+                                <span className="font-semibold text-slate-800 text-[13px]">{employee.middleName || '-'}</span>
+                              </td>
+                              <td className="px-3 py-4 whitespace-nowrap">
+                                <span className="text-slate-600 text-[13px]">{employee.sex || '-'}</span>
+                              </td>
+                              <td className="px-3 py-4 whitespace-nowrap">
+                                <span className="text-slate-500 text-[13px]">
+                                  {employee.birthday ? new Date(employee.birthday).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
+                                </span>
+                              </td>
+                              <td className="px-3 py-4 whitespace-nowrap">
+                                <span className="text-slate-600 text-[13px]">{employee.age || '-'}</span>
+                              </td>
+
+                              {showAllColumns && (
+                                <>
+                                  <td className="px-3 py-4 max-w-[150px] truncate">
+                                    <span
+                                      className="text-slate-600 text-[13px] cursor-help"
+                                      title={`${employee.street ? employee.street + ', ' : ''}${employee.barangay ? employee.barangay + ', ' : ''}${employee.city ? employee.city + ', ' : ''}${employee.province || ''}`}
+                                    >
+                                      {employee.city}{employee.city && employee.province ? ', ' : ''}{employee.province}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-4 whitespace-nowrap">
+                                    <span className="text-slate-600 text-[13px] font-medium">{employee.contactNumber || '-'}</span>
+                                  </td>
+                                  <td className="px-3 py-4 whitespace-nowrap">
+                                    <span className="text-slate-600 text-[13px] font-medium">{employee.email || '-'}</span>
+                                  </td>
+                                  <td className="px-3 py-4 whitespace-nowrap">
+                                    <span className="text-slate-600 text-[13px] font-medium">{employee.emergencyContact?.name || '-'}</span>
+                                  </td>
+                                  <td className="px-3 py-4 whitespace-nowrap">
+                                    <span className="text-slate-600 text-[13px] font-medium">{employee.emergencyContact?.contactNumber || '-'}</span>
+                                  </td>
+                                </>
+                              )}
+
+                              <td className="px-3 py-4 whitespace-nowrap">
+                                <span className="text-slate-600 text-[13px]">
+                                  {employee.reportingDate ? new Date(employee.reportingDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
+                                </span>
+                              </td>
+
+                              {showAllColumns && (
+                                <>
+                                  <td className="px-3 py-4 whitespace-nowrap">
+                                    <span className="text-slate-600 text-[13px] font-medium">{calculateTenure(employee.reportingDate)}</span>
+                                  </td>
+                                  <td className="px-3 py-4">
+                                    <span className="text-slate-600 text-[13px]">{employee.hiredPosition || employee.positionApplied || '-'}</span>
+                                  </td>
+                                </>
+                              )}
+
+
+                              {showAllColumns && (
+                                <>
+                                  <td className="px-3 py-4 whitespace-nowrap">
+                                    <span className="text-slate-600 text-[13px]">{employee.sssNo || '-'}</span>
+                                  </td>
+                                  <td className="px-3 py-4 whitespace-nowrap">
+                                    <span className="text-slate-600 text-[13px]">{employee.pagibigNo || '-'}</span>
+                                  </td>
+                                  <td className="px-3 py-4 whitespace-nowrap">
+                                    <span className="text-slate-600 text-[13px]">{employee.philhealthNo || '-'}</span>
+                                  </td>
+                                  <td className="px-3 py-4 whitespace-nowrap">
+                                    <span className="text-slate-600 text-[13px]">{employee.tinNo || '-'}</span>
+                                  </td>
+                                  <td className="px-3 py-4 whitespace-nowrap">
+                                    <span className="text-slate-600 text-[13px]">{employee.hiredDept || '-'}</span>
+                                  </td>
+                                  <td className="px-3 py-4 whitespace-nowrap">
+                                    <span className={`badge px-3 py-1 rounded-full text-[13px] ${employee.status === 'Active'
+                                      ? 'bg-emerald-100 text-emerald-700'
+                                      : 'bg-slate-100 text-slate-600'
+                                      }`}>
+                                      {employee.status}
+                                    </span>
+                                  </td>
+                                </>
+                              )}
+
+                              <td className="px-3 py-4 whitespace-nowrap">
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => handleEditEmployee(employee)}
+                                    className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                    title="Edit"
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleViewEmployee(employee)}
+                                    className="p-2 text-slate-600 hover:bg-slate-50 rounded-lg transition-all"
+                                    title="View Details"
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteEmployee(employee.id)}
+                                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mobile Cards */}
+                    <div className="lg:hidden divide-y divide-slate-100">
+                      {currentItems.map((employee) => (
+                        <div key={employee.id} className="p-6 hover:bg-slate-50 transition-all">
+                          <div className="flex items-start gap-4 mb-4">
+                            <div
+                              className="w-20 h-20 rounded-[5px] bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center flex-shrink-0 cursor-pointer shadow-sm"
+                              onClick={() => employee.profilePicture && setExpandedImage(employee.profilePicture)}
+                            >
+                              {employee.profilePicture ? (
+                                <img src={employee.profilePicture} className="w-full h-full object-cover" alt="" />
+                              ) : (
+                                <User className="w-10 h-10 text-slate-400" />
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <span className="badge font-bold text-slate-600 block mb-1">{employee.employeeIdNumber || employee.id}</span>
+                              <h3 className="font-bold text-lg text-slate-800">{employee.firstName} {employee.lastName}</h3>
+                            </div>
+                            <span className={`badge px-3 py-1 rounded-full ${employee.status === 'Active'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-slate-100 text-slate-600'
+                              }`}>
+                              {employee.status}
+                            </span>
+                          </div>
+                          <div className="space-y-2 mb-4">
+                            <p className="text-slate-600">
+                              <span className="font-semibold">Date Hired:</span> {employee.reportingDate ? new Date(employee.reportingDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
+                            </p>
+                            <p className="text-slate-600"><span className="font-semibold">Department:</span> {employee.hiredDept || '-'}</p>
+                            <p className="text-slate-500 text-sm">{employee.email}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleEditEmployee(employee)}
+                              className="flex-1 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg font-semibold hover:bg-indigo-100 transition-all flex items-center justify-center gap-2"
+                            >
+                              <Pencil className="w-4 h-4" />
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleViewEmployee(employee)}
+                              className="flex-1 px-4 py-2 bg-slate-50 text-slate-600 rounded-lg font-semibold hover:bg-slate-100 transition-all flex items-center justify-center gap-2"
+                            >
+                              <Eye className="w-4 h-4" />
+                              View
+                            </button>
+                            <button
+                              onClick={() => handleDeleteEmployee(employee.id)}
+                              className="flex-1 px-4 py-2 bg-red-50 text-red-600 rounded-lg font-semibold hover:bg-red-100 transition-all flex items-center justify-center gap-2"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-3 items-center gap-4">
+                    <p className="text-sm text-slate-500 text-center md:text-left">
+                      Showing <span className="font-bold">{indexOfFirstItem + 1}</span> to <span className="font-bold">{Math.min(indexOfLastItem, filteredEmployees.length)}</span> of <span className="font-bold">{filteredEmployees.length}</span> results
+                    </p>
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => setCurrentTablePage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentTablePage === 1}
+                        className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      >
+                        <ChevronLeft className="w-5 h-5 text-slate-600" />
+                      </button>
+                      {Array.from({ length: totalPages }, (_, i) => (
+                        <button
+                          key={i + 1}
+                          onClick={() => paginate(i + 1)}
+                          className={`w-10 h-10 rounded-lg font-semibold transition-all ${currentTablePage === i + 1
+                            ? 'bg-indigo-600 text-white shadow-lg'
+                            : 'text-slate-600 hover:bg-slate-50'
+                            }`}
+                        >
+                          {i + 1}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => setCurrentTablePage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={currentTablePage === totalPages}
+                        className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      >
+                        <ChevronRight className="w-5 h-5 text-slate-600" />
+                      </button>
+                    </div>
+                    <div className="hidden md:block"></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </main>
       </div>
 
@@ -3850,7 +3910,7 @@ const EmployeeDashboard = ({ user, onLogout }) => {
                 <div className="space-y-2">
                   <h3 className="text-xl font-bold text-slate-800">Confirm Delete</h3>
                   <p className="text-slate-600">
-                    Are you sure you want to delete <span className="font-bold text-slate-800">"{deleteTarget?.name}"</span>?
+                    Are you sure you want to delete <span className="font-bold text-slate-800">"{deleteTarget?.firstName} {deleteTarget?.lastName}"</span>?
                     This action cannot be undone.
                   </p>
                 </div>
@@ -3868,6 +3928,42 @@ const EmployeeDashboard = ({ user, onLogout }) => {
                   >
                     <Trash2 className="w-4 h-4" />
                     Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      }
+      {/* Sign Out Confirmation Modal */}
+      {
+        showSignOutModal && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] animate-in fade-in duration-300">
+            <div className="bg-white rounded-[2rem] shadow-2xl max-w-sm w-full p-8 border border-slate-100 card-enter">
+              <div className="flex flex-col items-center text-center space-y-6">
+                <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center text-red-500 ring-8 ring-red-50/50">
+                  <LogOut className="w-10 h-10" />
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-2xl font-black text-slate-800 tracking-tight">Sign Out</h3>
+                  <p className="text-slate-500 font-medium">
+                    Are you sure you want to sign out? You will need to login again to access your dashboard.
+                  </p>
+                </div>
+
+                <div className="flex gap-4 w-full pt-4">
+                  <button
+                    onClick={() => setShowSignOutModal(false)}
+                    className="flex-1 px-6 py-3 border-2 border-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-50 transition-all active:scale-95"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={onLogout}
+                    className="flex-1 px-6 py-3 bg-red-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-red-200 hover:bg-red-700 transition-all active:scale-95 flex items-center justify-center gap-2"
+                  >
+                    Sign Out
                   </button>
                 </div>
               </div>
