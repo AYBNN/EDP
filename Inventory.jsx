@@ -589,7 +589,6 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                     <option value="All">All Locations</option>
                                                     <option value="NPI Plant">NPI Plant</option>
                                                     <option value="Del Monte Plant">Del Monte Plant</option>
-                                                    <option value="Plant vs Zombies">Plant vs Zombies</option>
                                                     <option value="Balulang Shop">Balulang Shop</option>
                                                     <option value="EDP Conference Office">EDP Conference Office</option>
                                                     <option value="EDP Admin Office">EDP Admin Office</option>
@@ -892,7 +891,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                             value={isEditing ? editFormData.location : selectedAsset.location}
                                                             editable={isEditing}
                                                             onChange={(val) => setEditFormData({ ...editFormData, location: val })}
-                                                            options={['NPI Plant', 'Del Monte Plant', 'Plant vs Zombies', 'Balulang Shop', 'EDP Conference Office', 'EDP Admin Office']}
+                                                            options={['NPI Plant', 'Del Monte Plant', 'Balulang Shop', 'EDP Conference Office', 'EDP Admin Office']}
                                                         />
                                                         <InfoField
                                                             label="Last Adjust"
@@ -1325,7 +1324,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                             {showJobsiteDropdown && (
                                                                 <div className="absolute top-full left-[-10px] right-[-10px] mt-2 bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-100 py-2.5 z-[100] animate-in fade-in zoom-in-95 duration-200 ring-1 ring-slate-900/5">
                                                                     <div className="max-h-[160px] overflow-y-auto custom-scrollbar px-1.5">
-                                                                        {['NPI Plant', 'Del Monte Plant', 'Plant vs Zombies', 'Balulang Shop', 'EDP Conference Office', 'EDP Admin Office'].map((loc) => (
+                                                                        {['NPI Plant', 'Del Monte Plant', 'Balulang Shop', 'EDP Conference Office', 'EDP Admin Office'].map((loc) => (
                                                                             <button
                                                                                 key={loc}
                                                                                 type="button"
@@ -1671,7 +1670,6 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                         >
                                                             <option>NPI Plant</option>
                                                             <option>Del Monte Plant</option>
-                                                            <option>Plant vs Zombies</option>
                                                             <option>Balulang Shop</option>
                                                             <option>EDP Conference Office</option>
                                                             <option>EDP Admin Office</option>
