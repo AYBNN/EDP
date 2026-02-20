@@ -7,7 +7,7 @@ import {
     ArrowUpRight, ArrowDownRight, Printer, Download, Eye,
     Check, Pencil, Trash2, X, Upload, BarChart3, QrCode, Activity,
     FileText, Settings, ShieldCheck, Laptop, Monitor, MousePointer2,
-    Camera, Calendar, Hash
+    Camera, Calendar, Hash, ChevronDown
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
@@ -45,7 +45,10 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
     });
     const [loading, setLoading] = useState(true);
     const [fetchError, setFetchError] = useState(null);
+    const [showJobsiteDropdown, setShowJobsiteDropdown] = useState(false);
+    const [showFullHistory, setShowFullHistory] = useState(false);
     const detailsRef = useRef(null);
+    const jobsiteDropdownRef = useRef(null);
 
     // Unified mapping function for both inventory/consumables since they share the same schema
     const mapFromDB = (item) => ({
@@ -128,15 +131,17 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
 
     const stats = {
         total: assets?.length || 0,
-        available: assets?.filter(a => a?.status === 'Available').length || 0,
-        checkedOut: assets?.filter(a => a?.status === 'Checked Out').length || 0,
+        available: assets?.filter(a => a?.status === 'Available' && !(a?.quantity === 0 && tableName === 'consumables_inventory')).length || 0,
+        checkedOut: assets?.filter(a => a?.status === 'Checked Out' || a?.status === 'Out of Stock' || (a?.quantity === 0 && tableName === 'consumables_inventory')).length || 0,
         maintenance: assets?.filter(a => a?.status === 'Broken' || a?.status === 'In Repair').length || 0
     };
 
-    const getStatusColor = (status) => {
-        switch (status) {
+    const getStatusColor = (status, asset) => {
+        const effectiveStatus = (asset?.quantity === 0 && tableName === 'consumables_inventory') ? 'Out of Stock' : status;
+        switch (effectiveStatus) {
             case 'Available': return 'text-emerald-600';
             case 'Checked Out': return 'text-blue-600';
+            case 'Out of Stock': return 'text-rose-600';
             case 'Broken': return 'text-red-600';
             case 'In Repair': return 'text-orange-600';
             default: return 'text-slate-600';
@@ -153,9 +158,11 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
 
         if (selectedAsset.quantity && !isNaN(checkoutQty) && checkoutQty > 0) {
             newQuantity = Math.max(0, selectedAsset.quantity - checkoutQty);
-            // If items remain, keep status as Available (or whatever it was before), otherwise Checked Out
+            // If items remain, keep status as Available (or whatever it was before), otherwise Out of Stock
             if (newQuantity > 0) {
                 newStatus = selectedAsset.status; // Keep existing status (likely 'Available')
+            } else {
+                newStatus = 'Out of Stock';
             }
         }
 
@@ -177,7 +184,12 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                 {
                     date: new Date().toISOString().split('T')[0],
                     user: checkoutFormData.checkedOutBy || 'Admin',
-                    action: `Checked out ${checkoutFormData.quantity ? `(${checkoutFormData.quantity}) ` : ''}to ${checkoutFormData.name} at ${checkoutFormData.jobsite}`,
+                    action: (() => {
+                        const qtyPart = checkoutFormData.quantity ? `(${checkoutFormData.quantity}) ` : '';
+                        const namePart = checkoutFormData.name ? `to ${checkoutFormData.name}` : '';
+                        const jobPart = checkoutFormData.jobsite ? `at ${checkoutFormData.jobsite}` : '';
+                        return [`Checked out`, qtyPart, namePart, jobPart].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim() || 'Checked out';
+                    })(),
                     status: newStatus
                 },
                 ...(selectedAsset?.activity || [])
@@ -418,6 +430,17 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
     const totalPages = Math.ceil(filteredAssets.length / itemsPerPage);
     const paginatedAssets = filteredAssets.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
+    // Close dropdown on click outside
+    React.useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (jobsiteDropdownRef.current && !jobsiteDropdownRef.current.contains(event.target)) {
+                setShowJobsiteDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     // Reset to page 1 when filters change
     React.useEffect(() => {
         setCurrentPage(1);
@@ -532,6 +555,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                     <option value="All">All Status</option>
                                                     <option value="Available">Available</option>
                                                     <option value="Checked Out">Checked Out</option>
+                                                    <option value="Out of Stock">Out of Stock</option>
                                                     <option value="Broken">Broken</option>
                                                     <option value="In Repair">In Repair</option>
                                                 </select>
@@ -563,10 +587,12 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                     className="w-full appearance-none bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold text-slate-600 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer shadow-sm transition-all pr-8"
                                                 >
                                                     <option value="All">All Locations</option>
-                                                    <option value="1st Floor">1st Floor</option>
-                                                    <option value="2nd Floor">2nd Floor</option>
-                                                    <option value="3rd Floor">3rd Floor</option>
-                                                    <option value="Main Office">Main Office</option>
+                                                    <option value="NPI Plant">NPI Plant</option>
+                                                    <option value="Del Monte Plant">Del Monte Plant</option>
+                                                    <option value="Plant vs Zombies">Plant vs Zombies</option>
+                                                    <option value="Balulang Shop">Balulang Shop</option>
+                                                    <option value="EDP Conference Office">EDP Conference Office</option>
+                                                    <option value="EDP Admin Office">EDP Admin Office</option>
                                                 </select>
                                                 <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none group-hover:text-indigo-500 transition-colors" />
                                             </div>
@@ -602,10 +628,15 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                     </td>
                                                     <td className="px-6 py-5">
                                                         <div className="flex flex-col gap-1.5">
-                                                            <span className={`text-xs font-black uppercase tracking-wider w-fit flex items-center gap-1.5 ${getStatusColor(asset.status)}`}>
-                                                                <div className={`w-1.5 h-1.5 rounded-full ${asset.status === 'Available' ? 'bg-emerald-500' : 'bg-current'}`} />
-                                                                {asset.status}
-                                                            </span>
+                                                            {(() => {
+                                                                const effectiveStatus = (asset.quantity === 0 && tableName === 'consumables_inventory') ? 'Out of Stock' : asset.status;
+                                                                return (
+                                                                    <span className={`text-xs font-black uppercase tracking-wider w-fit flex items-center gap-1.5 ${getStatusColor(effectiveStatus, asset)}`}>
+                                                                        <div className={`w-1.5 h-1.5 rounded-full ${effectiveStatus === 'Available' ? 'bg-emerald-500' : 'bg-current'}`} />
+                                                                        {effectiveStatus}
+                                                                    </span>
+                                                                );
+                                                            })()}
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-5">
@@ -854,14 +885,14 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                             value={isEditing ? editFormData.type : selectedAsset.type}
                                                             editable={isEditing}
                                                             onChange={(val) => setEditFormData({ ...editFormData, type: val })}
-                                                            options={['Supplies', 'Small Machine', 'Electronics', 'Furniture', 'Computer']}
+                                                            options={['Consumable', 'Supplies', 'Small Machine', 'Electronics', 'Furniture', 'Computer']}
                                                         />
                                                         <InfoField
                                                             label="Location"
                                                             value={isEditing ? editFormData.location : selectedAsset.location}
                                                             editable={isEditing}
                                                             onChange={(val) => setEditFormData({ ...editFormData, location: val })}
-                                                            options={['1st Floor', '2nd Floor', '3rd Floor', '4th Floor', 'Warehouse', 'Satellite Office']}
+                                                            options={['NPI Plant', 'Del Monte Plant', 'Plant vs Zombies', 'Balulang Shop', 'EDP Conference Office', 'EDP Admin Office']}
                                                         />
                                                         <InfoField
                                                             label="Last Adjust"
@@ -934,17 +965,17 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                     )}
                                                 </div>
 
-                                                <div className={`mt-6 p-5 rounded-2xl border-2 border-dashed transition-all ${selectedAsset.status === 'Checked Out'
+                                                <div className={`mt-6 p-5 rounded-2xl border-2 border-dashed transition-all ${['Checked Out', 'Out of Stock'].includes(selectedAsset.status)
                                                     ? 'bg-blue-50/50 border-blue-200'
                                                     : 'bg-emerald-50/50 border-emerald-200'
                                                     }`}>
-                                                    {selectedAsset.status === 'Checked Out' ? (
+                                                    {['Checked Out', 'Out of Stock'].includes(selectedAsset.status) || (selectedAsset.quantity === 0 && tableName === 'consumables_inventory') ? (
                                                         <div className="space-y-4">
                                                             <div className="flex items-center justify-between">
-                                                                <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Custody Status</p>
+                                                                <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">{selectedAsset.status === 'Out of Stock' || selectedAsset.quantity === 0 ? 'Stock Depleted' : 'Custody Status'}</p>
                                                                 <div className="flex items-center gap-1.5">
                                                                     <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                                                                    <span className="text-[10px] font-bold text-blue-500 uppercase">Live</span>
+                                                                    <span className="text-[10px] font-bold text-blue-500 uppercase">{selectedAsset.status === 'Out of Stock' || selectedAsset.quantity === 0 ? 'Empty' : 'Live'}</span>
                                                                 </div>
                                                             </div>
                                                             <div className="flex items-center gap-3">
@@ -978,24 +1009,31 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                             </div>
                                                             <button
                                                                 onClick={handleReturnSubmit}
-                                                                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-blue-200 transition-all flex items-center justify-center gap-2 group/btn"
+                                                                disabled={selectedAsset.status === 'Out of Stock' || (selectedAsset.quantity === 0 && tableName === 'consumables_inventory')}
+                                                                className={`w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 group/btn shadow-lg ${selectedAsset.status === 'Out of Stock' || (selectedAsset.quantity === 0 && tableName === 'consumables_inventory')
+                                                                    ? 'bg-rose-600 text-white cursor-not-allowed border-none shadow-rose-200'
+                                                                    : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200'
+                                                                    }`}
                                                             >
                                                                 <CheckCircle2 className="w-3.5 h-3.5 group-hover/btn:scale-110 transition-transform" />
-                                                                Mark as Returned
+                                                                {selectedAsset.status === 'Out of Stock' || (selectedAsset.quantity === 0 && tableName === 'consumables_inventory') ? 'Out of Stock' : 'Mark as Returned'}
                                                             </button>
                                                         </div>
                                                     ) : (() => {
+                                                        const isOutOfStock = selectedAsset.quantity === 0 && tableName === 'consumables_inventory';
                                                         const isUnavailable =
-                                                            ['In Repair', 'Broken'].includes(selectedAsset.status) ||
-                                                            ['Critical', 'Broken', 'Poor'].includes(selectedAsset.condition);
+                                                            ['In Repair', 'Broken', 'Out of Stock'].includes(selectedAsset.status) ||
+                                                            ['Critical', 'Broken', 'Poor'].includes(selectedAsset.condition) ||
+                                                            isOutOfStock;
 
                                                         if (isUnavailable) {
+                                                            const unavailableReason = (selectedAsset.status === 'Out of Stock' || isOutOfStock) ? 'Zero Inventory - Out of Stock' : 'Unit Unavailable for Deployment';
                                                             return (
                                                                 <div className="text-center space-y-4 py-2">
                                                                     <div className="w-12 h-12 bg-rose-100 rounded-full flex items-center justify-center mx-auto">
                                                                         <AlertCircle className="w-6 h-6 text-rose-600" />
                                                                     </div>
-                                                                    <p className="text-xs font-black text-rose-600 tracking-wide uppercase px-4">Unit Unavailable for Deployment</p>
+                                                                    <p className="text-xs font-black text-rose-600 tracking-wide uppercase px-4">{unavailableReason}</p>
                                                                     <button
                                                                         disabled
                                                                         className="w-full bg-slate-200 text-slate-400 py-3 rounded-2xl text-xs font-black cursor-not-allowed flex items-center justify-center gap-2"
@@ -1012,6 +1050,15 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                                     <ShieldCheck className="w-6 h-6 text-emerald-600" />
                                                                 </div>
                                                                 <p className="text-xs font-black text-emerald-600 tracking-wide">UNIT READY FOR DEPLOYMENT</p>
+
+                                                                <button
+                                                                    onClick={() => setActiveTab('history')}
+                                                                    className="w-full py-3 bg-blue-600 text-white border border-blue-500 rounded-[1.2rem] text-[10px] font-black uppercase tracking-[0.2em] shadow-md hover:bg-blue-700 transition-all flex items-center justify-center gap-2 group/hist"
+                                                                >
+                                                                    <History className="w-3.5 h-3.5 group-hover/hist:scale-110 transition-transform text-blue-100" />
+                                                                    Check Out History
+                                                                </button>
+
                                                                 <button
                                                                     onClick={() => {
                                                                         setCheckoutFormData({
@@ -1021,7 +1068,8 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                                             jobsite: '',
                                                                             name: '',
                                                                             email: '',
-                                                                            phone: ''
+                                                                            phone: '',
+                                                                            quantity: ''
                                                                         });
                                                                         setShowCheckoutModal(true);
                                                                     }}
@@ -1112,29 +1160,52 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                             <div className="absolute left-[23px] top-0 bottom-0 w-0.5 bg-slate-100" />
                                             <div className="space-y-8 relative">
                                                 {(selectedAsset.activity || []).length > 0 ? (
-                                                    selectedAsset.activity.map((item, i) => (
-                                                        <div key={i} className="flex items-start gap-10 group">
-                                                            <div className="w-12 h-12 rounded-2xl bg-white border-2 border-slate-100 flex items-center justify-center z-10 shadow-sm group-hover:border-indigo-500 group-hover:scale-110 transition-all duration-500">
-                                                                <Activity className="w-5 h-5 text-indigo-600" />
-                                                            </div>
-                                                            <div className="flex-1 bg-slate-50/50 p-6 rounded-3xl border border-slate-100 group-hover:bg-white group-hover:shadow-xl group-hover:shadow-indigo-500/5 transition-all">
-                                                                <div className="flex items-center justify-between mb-2">
-                                                                    <p className="text-sm font-black text-slate-800">{item.action}</p>
-                                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.date}</span>
+                                                    <>
+                                                        {(showFullHistory ? selectedAsset.activity : selectedAsset.activity.slice(0, 3)).map((item, i) => (
+                                                            <div key={i} className="flex items-start gap-10 group">
+                                                                <div className="w-12 h-12 rounded-2xl bg-white border-2 border-slate-100 flex items-center justify-center z-10 shadow-sm group-hover:border-indigo-500 group-hover:scale-110 transition-all duration-500">
+                                                                    <Activity className="w-5 h-5 text-indigo-600" />
                                                                 </div>
-                                                                <div className="flex items-center gap-4">
-                                                                    <div className="flex items-center gap-1.5 text-xs text-slate-500 font-bold">
-                                                                        <User className="w-3.5 h-3.5" />
-                                                                        {item.user}
+                                                                <div className="flex-1 bg-slate-50/50 p-6 rounded-3xl border border-slate-100 group-hover:bg-white group-hover:shadow-xl group-hover:shadow-indigo-500/5 transition-all">
+                                                                    <div className="flex items-center justify-between mb-2">
+                                                                        <p className="text-sm font-black text-slate-800">{item.action}</p>
+                                                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.date}</span>
                                                                     </div>
-                                                                    <div className="flex items-center gap-1.5">
-                                                                        <div className={`w-1.5 h-1.5 rounded-full ${item.status === 'Good' || item.status === 'New' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                                                                        <span className="text-[10px] font-black text-slate-400 uppercase">{item.status}</span>
+                                                                    <div className="flex items-center gap-4">
+                                                                        <div className="flex items-center gap-1.5 text-xs text-slate-500 font-bold">
+                                                                            <User className="w-3.5 h-3.5" />
+                                                                            {item.user}
+                                                                        </div>
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <div className={`w-1.5 h-1.5 rounded-full ${item.status === 'Good' || item.status === 'New' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                                                                            <span className="text-[10px] font-black text-slate-400 uppercase">{item.status}</span>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                    ))
+                                                        ))}
+
+                                                        {selectedAsset.activity.length > 3 && (
+                                                            <div className="flex justify-center ml-20 pt-4">
+                                                                <button
+                                                                    onClick={() => setShowFullHistory(!showFullHistory)}
+                                                                    className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-black text-slate-400 uppercase tracking-widest hover:text-indigo-600 hover:border-indigo-100 hover:bg-indigo-50/30 transition-all shadow-sm group/btn"
+                                                                >
+                                                                    {showFullHistory ? (
+                                                                        <>
+                                                                            <ChevronDown className="w-3 h-3 rotate-180 group-hover/btn:-translate-y-0.5 transition-transform" />
+                                                                            Show Less History
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <Plus className="w-3 h-3 group-hover/btn:rotate-90 transition-transform" />
+                                                                            Show Entire History ({selectedAsset.activity.length})
+                                                                        </>
+                                                                    )}
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </>
                                                 ) : (
                                                     <div className="flex flex-col items-center justify-center py-20 text-center">
                                                         <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center mb-4">
@@ -1188,7 +1259,6 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                         <label className="text-[11px] font-black text-black uppercase tracking-widest block">Check Out</label>
                                                         <input
                                                             type="date"
-                                                            required
                                                             className="w-full bg-transparent border-none p-0 text-sm font-bold text-black focus:ring-0 outline-none cursor-pointer"
                                                             value={checkoutFormData.checkOutDate}
                                                             onChange={(e) => setCheckoutFormData({ ...checkoutFormData, checkOutDate: e.target.value })}
@@ -1202,10 +1272,9 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                         <Clock className="w-2.5 h-2.5 text-rose-500 group-focus-within:text-white" />
                                                     </div>
                                                     <div className="flex-1">
-                                                        <label className="text-[11px] font-black text-black uppercase tracking-widest block">Return Date</label>
+                                                        <label className="text-[11px] font-black text-black uppercase tracking-widest block">Return Date <span className="text-[9px] opacity-50 ml-1 lowercase font-bold">(Optional)</span></label>
                                                         <input
                                                             type="date"
-                                                            required
                                                             className="w-full bg-transparent border-none p-0 text-sm font-bold text-black focus:ring-0 outline-none cursor-pointer"
                                                             value={checkoutFormData.returnDue}
                                                             onChange={(e) => setCheckoutFormData({ ...checkoutFormData, returnDue: e.target.value })}
@@ -1217,7 +1286,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
 
                                         {/* Group 2: Assignment Details */}
                                         <div className="grid grid-cols-2 gap-2.5">
-                                            <div className="relative group overflow-hidden rounded-xl border border-slate-100 bg-slate-50/50 p-2 transition-all focus-within:ring-2 focus-within:ring-amber-500/10 focus-within:border-amber-500/50 focus-within:bg-white">
+                                            <div className="relative group rounded-xl border border-slate-100 bg-slate-50/50 p-2 transition-all focus-within:ring-2 focus-within:ring-amber-500/10 focus-within:border-amber-500/50 focus-within:bg-white">
                                                 <div className="flex items-center gap-2">
                                                     <div className="p-1 bg-white rounded-md shadow-sm border border-slate-100 group-focus-within:bg-amber-500 group-focus-within:border-amber-500 transition-colors">
                                                         <User className="w-2.5 h-2.5 text-amber-500 group-focus-within:text-white" />
@@ -1226,7 +1295,6 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                         <label className="text-[11px] font-black text-black uppercase tracking-widest block">Check out by:</label>
                                                         <input
                                                             type="text"
-                                                            required
                                                             placeholder=""
                                                             className="w-full bg-transparent border-none p-0 text-sm font-bold text-black focus:ring-0 outline-none placeholder:text-slate-400"
                                                             value={checkoutFormData.checkedOutBy}
@@ -1235,28 +1303,58 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div className="relative group overflow-hidden rounded-xl border border-slate-100 bg-slate-50/50 p-2 transition-all focus-within:ring-2 focus-within:ring-indigo-500/10 focus-within:border-indigo-500/50 focus-within:bg-white">
+                                            <div className="relative group rounded-xl border border-slate-100 bg-slate-50/50 p-2 transition-all focus-within:ring-2 focus-within:ring-indigo-500/10 focus-within:border-indigo-500/50 focus-within:bg-white">
                                                 <div className="flex items-center gap-2">
                                                     <div className="p-1 bg-white rounded-md shadow-sm border border-slate-100 group-focus-within:bg-indigo-600 group-focus-within:border-indigo-600 transition-colors">
                                                         <MapPin className="w-2.5 h-2.5 text-indigo-600 group-focus-within:text-white" />
                                                     </div>
-                                                    <div className="flex-1">
+                                                    <div className="flex-1 relative" ref={jobsiteDropdownRef}>
                                                         <label className="text-[11px] font-black text-black uppercase tracking-widest block">Jobsite/Area</label>
-                                                        <input
-                                                            type="text"
-                                                            required
-                                                            placeholder=""
-                                                            className="w-full bg-transparent border-none p-0 text-sm font-bold text-black focus:ring-0 outline-none placeholder:text-slate-400 uppercase truncate"
-                                                            value={checkoutFormData.jobsite}
-                                                            onChange={(e) => setCheckoutFormData({ ...checkoutFormData, jobsite: e.target.value })}
-                                                        />
+                                                        <div className="relative mt-1">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setShowJobsiteDropdown(!showJobsiteDropdown)}
+                                                                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-0 py-1.5 text-xs font-bold text-black focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500/50 transition-all outline-none flex items-center justify-between group/js cursor-pointer"
+                                                            >
+                                                                <span className={!checkoutFormData.jobsite ? 'text-slate-400' : 'text-black'}>
+                                                                    {checkoutFormData.jobsite || 'Select Location'}
+                                                                </span>
+                                                                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-all duration-300 ${showJobsiteDropdown ? 'rotate-180 text-indigo-600' : 'group-hover/js:text-indigo-400'}`} />
+                                                            </button>
+
+                                                            {showJobsiteDropdown && (
+                                                                <div className="absolute top-full left-[-10px] right-[-10px] mt-2 bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-100 py-2.5 z-[100] animate-in fade-in zoom-in-95 duration-200 ring-1 ring-slate-900/5">
+                                                                    <div className="max-h-[160px] overflow-y-auto custom-scrollbar px-1.5">
+                                                                        {['NPI Plant', 'Del Monte Plant', 'Plant vs Zombies', 'Balulang Shop', 'EDP Conference Office', 'EDP Admin Office'].map((loc) => (
+                                                                            <button
+                                                                                key={loc}
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    setCheckoutFormData({ ...checkoutFormData, jobsite: loc });
+                                                                                    setShowJobsiteDropdown(false);
+                                                                                }}
+                                                                                className={`w-full px-3.5 py-2.5 text-left text-[13px] font-bold rounded-xl transition-all flex items-center justify-between group/opt mb-0.5 last:mb-0 ${checkoutFormData.jobsite === loc
+                                                                                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200'
+                                                                                    : 'text-slate-600 hover:bg-slate-50 hover:text-indigo-600'
+                                                                                    }`}
+                                                                            >
+                                                                                <span className="truncate">{loc}</span>
+                                                                                {checkoutFormData.jobsite === loc && (
+                                                                                    <Check className="w-3.5 h-3.5 text-white" />
+                                                                                )}
+                                                                            </button>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
 
                                         {/* Conditional Quantity Field */}
-                                        {(selectedAsset?.quantity && selectedAsset.quantity > 0) && (
+                                        {selectedAsset?.quantity > 0 && (
                                             <div className="flex justify-center">
                                                 <div className="w-1/2 relative group overflow-hidden rounded-xl border border-slate-100 bg-slate-50/50 p-2 transition-all focus-within:ring-2 focus-within:ring-indigo-500/10 focus-within:border-indigo-500/50 focus-within:bg-white">
                                                     <div className="flex items-center gap-2">
@@ -1301,7 +1399,6 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                                 <label className="text-[10px] font-black text-black uppercase tracking-widest block">Name</label>
                                                                 <input
                                                                     type="text"
-                                                                    required
                                                                     placeholder=""
                                                                     className="w-full bg-transparent border-none p-0 text-sm font-bold text-black focus:ring-0 outline-none placeholder:text-slate-400"
                                                                     value={checkoutFormData.name}
@@ -1320,7 +1417,6 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                                     <label className="text-[10px] font-black text-black uppercase tracking-widest block">Email</label>
                                                                     <input
                                                                         type="email"
-                                                                        required
                                                                         placeholder=""
                                                                         className="w-full bg-transparent border-none p-0 text-[12px] font-bold text-black focus:ring-0 outline-none placeholder:text-slate-400 truncate"
                                                                         value={checkoutFormData.email}
@@ -1338,7 +1434,6 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                                     <label className="text-[10px] font-black text-black uppercase tracking-widest block">Phone</label>
                                                                     <input
                                                                         type="tel"
-                                                                        required
                                                                         placeholder=""
                                                                         maxLength="11"
                                                                         inputMode="numeric"
@@ -1532,6 +1627,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                             value={newAssetFormData.type}
                                                             onChange={(e) => setNewAssetFormData({ ...newAssetFormData, type: e.target.value })}
                                                         >
+                                                            <option>Consumable</option>
                                                             <option>Supplies</option>
                                                             <option>Small Machine</option>
                                                             <option>Electronics</option>
@@ -1573,12 +1669,12 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                             value={newAssetFormData.location}
                                                             onChange={(e) => setNewAssetFormData({ ...newAssetFormData, location: e.target.value })}
                                                         >
-                                                            <option>1st Floor</option>
-                                                            <option>2nd Floor</option>
-                                                            <option>3rd Floor</option>
-                                                            <option>4th Floor</option>
-                                                            <option>Warehouse</option>
-                                                            <option>Satellite Office</option>
+                                                            <option>NPI Plant</option>
+                                                            <option>Del Monte Plant</option>
+                                                            <option>Plant vs Zombies</option>
+                                                            <option>Balulang Shop</option>
+                                                            <option>EDP Conference Office</option>
+                                                            <option>EDP Admin Office</option>
                                                         </select>
                                                     </div>
                                                     <div className="col-span-2 space-y-1.5">
