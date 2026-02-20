@@ -7,7 +7,7 @@ import {
     ArrowUpRight, ArrowDownRight, Printer, Download, Eye,
     Check, Pencil, Trash2, X, Upload, BarChart3, QrCode, Activity,
     FileText, Settings, ShieldCheck, Laptop, Monitor, MousePointer2,
-    Camera, Calendar
+    Camera, Calendar, Hash
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
@@ -40,73 +40,49 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
         jobsite: '',
         name: '',
         email: '',
-        phone: ''
+        phone: '',
+        quantity: ''
     });
     const [loading, setLoading] = useState(true);
     const [fetchError, setFetchError] = useState(null);
     const detailsRef = useRef(null);
 
-    const mapFromDB = (item) => isConsumables ? ({
+    // Unified mapping function for both inventory/consumables since they share the same schema
+    const mapFromDB = (item) => ({
         id: item.id,
         name: item.name,
-        description: item.description || '',
-        quantity: item.quantity || '',
-        unit: item.unit || '',
-        location: item.location || '',
+        model: item.model || '',
+        manufacturer: item.manufacturer || '',
+        serial: item.serial || '',
+        barcode: item.barcode || '',
         status: item.status || 'Available',
+        location: item.location || '',
+        condition: item.condition || 'Excellent',
+        type: item.type || '',
+        lastAdjust: item.last_adjust || null,
         notes: item.notes || '',
-        originalCost: item.original_cost,
-        currentValue: item.current_value,
-        imageUrl: item.image_url || '',
-        activity: Array.isArray(item.activity) ? item.activity : [],
-    }) : ({
-        id: item.id,
-        name: item.name,
-        model: item.model,
-        manufacturer: item.manufacturer,
-        serial: item.serial,
-        barcode: item.barcode,
-        status: item.status,
-        location: item.location,
-        condition: item.condition,
-        type: item.type,
-        lastAdjust: item.last_adjust,
-        notes: item.notes,
-        checkedOutDate: item.checked_out_date,
-        returnDue: item.return_due,
+        checkedOutDate: item.checked_out_date || null,
+        returnDue: item.return_due || null,
         originalCost: item.original_cost,
         currentValue: item.current_value,
         imageUrl: item.image_url || '',
         activity: Array.isArray(item.activity) ? item.activity : [],
         checkedOutTo: item.checked_out_to || null,
-        quantity: item.quantity || '',
+        quantity: item.quantity || 0,
         description: item.description || ''
     });
 
-    const mapToDB = (item) => isConsumables ? ({
+    const mapToDB = (item) => ({
         id: item.id,
         name: item.name,
-        description: item.description || null,
-        quantity: item.quantity || null,
-        unit: item.unit || null,
-        location: item.location || null,
+        model: item.model || null,
+        manufacturer: item.manufacturer || null,
+        serial: item.serial || null,
+        barcode: item.barcode || null,
         status: item.status || 'Available',
-        notes: item.notes || null,
-        original_cost: item.originalCost === '' ? null : item.originalCost,
-        current_value: item.currentValue === '' ? null : item.currentValue,
-        image_url: item.imageUrl || null,
-        activity: Array.isArray(item.activity) ? item.activity : [],
-    }) : ({
-        id: item.id,
-        name: item.name,
-        model: item.model,
-        manufacturer: item.manufacturer,
-        serial: item.serial,
-        barcode: item.barcode,
-        status: item.status,
-        location: item.location,
-        condition: item.condition,
-        type: item.type,
+        location: item.location || null,
+        condition: item.condition || null,
+        type: item.type || null,
         last_adjust: item.lastAdjust || null,
         notes: item.notes || null,
         checked_out_date: item.checkedOutDate || null,
@@ -124,6 +100,10 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
         try {
             setLoading(true);
             setFetchError(null);
+
+            // Log for debugging
+            console.log(`Fetching from table: ${tableName}`);
+
             const { data, error } = await supabase
                 .from(tableName)
                 .select('*')
@@ -141,6 +121,9 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
 
     React.useEffect(() => {
         fetchAssets();
+        setSelectedAsset(null); // Reset selection when switching tables
+        setSearchQuery(''); // Optional: clear search query
+        setCurrentPage(1); // Reset to first page
     }, [tableName]);
 
     const stats = {
@@ -162,11 +145,28 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
 
     const handleCheckoutSubmit = async (e) => {
         e.preventDefault();
+
+        // Calculate new quantity if applicable
+        let newQuantity = selectedAsset.quantity;
+        let newStatus = 'Checked Out';
+        const checkoutQty = parseInt(checkoutFormData.quantity);
+
+        if (selectedAsset.quantity && !isNaN(checkoutQty) && checkoutQty > 0) {
+            newQuantity = Math.max(0, selectedAsset.quantity - checkoutQty);
+            // If items remain, keep status as Available (or whatever it was before), otherwise Checked Out
+            if (newQuantity > 0) {
+                newStatus = selectedAsset.status; // Keep existing status (likely 'Available')
+            }
+        }
+
         const updatedAssetData = {
             ...selectedAsset,
-            status: 'Checked Out',
+            status: newStatus,
+            quantity: newQuantity,
             checkedOutDate: checkoutFormData.checkOutDate,
             returnDue: checkoutFormData.returnDue,
+            // Only set checkedOutTo if fully checked out or if we want to track the last person
+            // For now, let's keep it as is, but be aware it overwrites previous "checked out to" if multiple people take from a pile
             checkedOutTo: {
                 name: checkoutFormData.name,
                 email: checkoutFormData.email,
@@ -177,8 +177,8 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                 {
                     date: new Date().toISOString().split('T')[0],
                     user: checkoutFormData.checkedOutBy || 'Admin',
-                    action: `Checked out to ${checkoutFormData.name} at ${checkoutFormData.jobsite}`,
-                    status: 'Checked Out'
+                    action: `Checked out ${checkoutFormData.quantity ? `(${checkoutFormData.quantity}) ` : ''}to ${checkoutFormData.name} at ${checkoutFormData.jobsite}`,
+                    status: newStatus
                 },
                 ...(selectedAsset?.activity || [])
             ]
@@ -202,7 +202,8 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                 jobsite: '',
                 name: '',
                 email: '',
-                phone: ''
+                phone: '',
+                quantity: ''
             });
         } catch (error) {
             console.error('Error checking out asset:', error);
@@ -335,38 +336,23 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
     };
 
     const handleAddClick = () => {
-        if (isConsumables) {
-            setNewAssetFormData({
-                name: '',
-                description: '',
-                quantity: '',
-                unit: 'pcs',
-                location: '1st Floor',
-                status: 'Available',
-                notes: '',
-                originalCost: '',
-                currentValue: '',
-                imageUrl: ''
-            });
-        } else {
-            setNewAssetFormData({
-                name: '',
-                type: 'Supplies',
-                manufacturer: '',
-                model: '',
-                serial: '',
-                description: '',
-                barcode: '',
-                location: '1st Floor',
-                condition: 'Excellent',
-                quantity: '',
-                status: 'Available',
-                notes: '',
-                originalCost: '',
-                currentValue: '',
-                imageUrl: ''
-            });
-        }
+        setNewAssetFormData({
+            name: '',
+            type: 'Supplies',
+            manufacturer: '',
+            model: '',
+            serial: '',
+            description: '',
+            barcode: '',
+            location: '1st Floor',
+            condition: 'Excellent',
+            quantity: '',
+            status: 'Available',
+            notes: '',
+            originalCost: '',
+            currentValue: '',
+            imageUrl: ''
+        });
         setShowAddModal(true);
     };
 
@@ -903,7 +889,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                 </div>
 
                                                 <div className="bg-slate-50/50 p-6 rounded-[2rem] border border-slate-100 ring-1 ring-slate-900/5 mt-8">
-                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3">Technical Maintenance Notes</label>
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3">Notes</label>
                                                     {isEditing ? (
                                                         <textarea
                                                             className="w-full bg-indigo-50/50 border border-indigo-100 rounded-xl px-4 py-3 text-sm font-bold text-indigo-600 outline-none focus:ring-1 focus:ring-indigo-500/30 min-h-[100px] resize-none"
@@ -1269,6 +1255,31 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                             </div>
                                         </div>
 
+                                        {/* Conditional Quantity Field */}
+                                        {(selectedAsset?.quantity && selectedAsset.quantity > 0) && (
+                                            <div className="flex justify-center">
+                                                <div className="w-1/2 relative group overflow-hidden rounded-xl border border-slate-100 bg-slate-50/50 p-2 transition-all focus-within:ring-2 focus-within:ring-indigo-500/10 focus-within:border-indigo-500/50 focus-within:bg-white">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="p-1 bg-white rounded-md shadow-sm border border-slate-100 group-focus-within:bg-indigo-600 group-focus-within:border-indigo-600 transition-colors">
+                                                            <Hash className="w-2.5 h-2.5 text-indigo-600 group-focus-within:text-white" />
+                                                        </div>
+                                                        <div className="flex-1 text-center">
+                                                            <label className="text-[11px] font-black text-black uppercase tracking-widest block">Quantity</label>
+                                                            <input
+                                                                type="number"
+                                                                min="1"
+                                                                max={selectedAsset.quantity}
+                                                                className="w-full bg-transparent border-none p-0 text-sm font-bold text-black focus:ring-0 outline-none text-center"
+                                                                value={checkoutFormData.quantity}
+                                                                onChange={(e) => setCheckoutFormData({ ...checkoutFormData, quantity: e.target.value })}
+                                                                onKeyDown={(e) => ['e', 'E', '+', '-'].includes(e.key) && e.preventDefault()}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         {/* Group 3: Custodian Data */}
                                         <div className="rounded-2xl p-3 relative overflow-hidden group/custodian transition-all duration-500 border border-slate-100 bg-slate-50/50 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-500/10 focus-within:border-indigo-500/50">
                                             <div className="absolute top-0 right-0 p-4 opacity-5 group-hover/custodian:opacity-10 transition-opacity">
@@ -1465,23 +1476,21 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                         <option>In Repair</option>
                                                     </select>
                                                 </div>
-                                                {!isConsumables && (
-                                                    <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
-                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Condition</label>
-                                                        <select
-                                                            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500/50 transition-all outline-none"
-                                                            value={newAssetFormData.condition}
-                                                            onChange={(e) => setNewAssetFormData({ ...newAssetFormData, condition: e.target.value })}
-                                                        >
-                                                            <option>Excellent</option>
-                                                            <option>Good</option>
-                                                            <option>Fair</option>
-                                                            <option>Poor</option>
-                                                            <option>Broken</option>
-                                                            <option>Critical</option>
-                                                        </select>
-                                                    </div>
-                                                )}
+                                                <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Condition</label>
+                                                    <select
+                                                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500/50 transition-all outline-none"
+                                                        value={newAssetFormData.condition}
+                                                        onChange={(e) => setNewAssetFormData({ ...newAssetFormData, condition: e.target.value })}
+                                                    >
+                                                        <option>Excellent</option>
+                                                        <option>Good</option>
+                                                        <option>Fair</option>
+                                                        <option>Poor</option>
+                                                        <option>Broken</option>
+                                                        <option>Critical</option>
+                                                    </select>
+                                                </div>
                                                 <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
                                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Quantity</label>
                                                     <input
@@ -1493,26 +1502,6 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                         min="0"
                                                     />
                                                 </div>
-                                                {isConsumables && (
-                                                    <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
-                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Unit</label>
-                                                        <select
-                                                            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500/50 transition-all outline-none"
-                                                            value={newAssetFormData.unit}
-                                                            onChange={(e) => setNewAssetFormData({ ...newAssetFormData, unit: e.target.value })}
-                                                        >
-                                                            <option>pcs</option>
-                                                            <option>boxes</option>
-                                                            <option>bottles</option>
-                                                            <option>liters</option>
-                                                            <option>kg</option>
-                                                            <option>meters</option>
-                                                            <option>rolls</option>
-                                                            <option>packs</option>
-                                                            <option>sets</option>
-                                                        </select>
-                                                    </div>
-                                                )}
                                             </div>
                                         </div>
 
@@ -1522,125 +1511,87 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                             {/* Section: General */}
                                             <div className="space-y-4">
                                                 <h3 className="text-[11px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
-                                                    <div className="w-1 h-3 bg-indigo-600 rounded-full" /> {isConsumables ? 'Item Details' : 'Unit Details'}
+                                                    <div className="w-1 h-3 bg-indigo-600 rounded-full" /> {tableName === 'consumables_inventory' ? 'Item Details' : 'Unit Details'}
                                                 </h3>
-                                                {isConsumables ? (
-                                                    <div className="grid grid-cols-2 gap-4">
-                                                        <div className="space-y-1.5">
-                                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Item Name</label>
-                                                            <input
-                                                                type="text"
-                                                                required
-                                                                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500/50 transition-all outline-none"
-                                                                value={newAssetFormData.name}
-                                                                onChange={(e) => setNewAssetFormData({ ...newAssetFormData, name: e.target.value })}
-                                                            />
-                                                        </div>
-                                                        <div className="space-y-1.5">
-                                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Location</label>
-                                                            <select
-                                                                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500/50 transition-all outline-none"
-                                                                value={newAssetFormData.location}
-                                                                onChange={(e) => setNewAssetFormData({ ...newAssetFormData, location: e.target.value })}
-                                                            >
-                                                                <option>1st Floor</option>
-                                                                <option>2nd Floor</option>
-                                                                <option>3rd Floor</option>
-                                                                <option>4th Floor</option>
-                                                                <option>Warehouse</option>
-                                                                <option>Satellite Office</option>
-                                                            </select>
-                                                        </div>
-                                                        <div className="col-span-2 space-y-1.5">
-                                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Item Description</label>
-                                                            <textarea
-                                                                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500/50 transition-all outline-none min-h-[80px] resize-none"
-                                                                value={newAssetFormData.description}
-                                                                onChange={(e) => setNewAssetFormData({ ...newAssetFormData, description: e.target.value })}
-                                                                placeholder=""
-                                                            />
-                                                        </div>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{tableName === 'consumables_inventory' ? 'Item Name' : 'Unit Name'}</label>
+                                                        <input
+                                                            type="text"
+                                                            required
+                                                            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500/50 transition-all outline-none"
+                                                            value={newAssetFormData.name}
+                                                            onChange={(e) => setNewAssetFormData({ ...newAssetFormData, name: e.target.value })}
+                                                            placeholder=""
+                                                        />
                                                     </div>
-                                                ) : (
-                                                    <div className="grid grid-cols-2 gap-4">
-                                                        <div className="space-y-1.5">
-                                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Unit Name</label>
-                                                            <input
-                                                                type="text"
-                                                                required
-                                                                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500/50 transition-all outline-none"
-                                                                value={newAssetFormData.name}
-                                                                onChange={(e) => setNewAssetFormData({ ...newAssetFormData, name: e.target.value })}
-                                                                placeholder=""
-                                                            />
-                                                        </div>
-                                                        <div className="space-y-1.5">
-                                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Type</label>
-                                                            <select
-                                                                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500/50 transition-all outline-none"
-                                                                value={newAssetFormData.type}
-                                                                onChange={(e) => setNewAssetFormData({ ...newAssetFormData, type: e.target.value })}
-                                                            >
-                                                                <option>Supplies</option>
-                                                                <option>Small Machine</option>
-                                                                <option>Electronics</option>
-                                                                <option>Furniture</option>
-                                                                <option>Computer</option>
-                                                            </select>
-                                                        </div>
-                                                        <div className="space-y-1.5">
-                                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Manufacturer</label>
-                                                            <input
-                                                                type="text"
-                                                                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500/50 transition-all outline-none"
-                                                                value={newAssetFormData.manufacturer}
-                                                                onChange={(e) => setNewAssetFormData({ ...newAssetFormData, manufacturer: e.target.value })}
-                                                            />
-                                                        </div>
-                                                        <div className="space-y-1.5">
-                                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Model</label>
-                                                            <input
-                                                                type="text"
-                                                                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500/50 transition-all outline-none"
-                                                                value={newAssetFormData.model}
-                                                                onChange={(e) => setNewAssetFormData({ ...newAssetFormData, model: e.target.value })}
-                                                            />
-                                                        </div>
-                                                        <div className="space-y-1.5">
-                                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Serial #</label>
-                                                            <input
-                                                                type="text"
-                                                                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500/50 transition-all outline-none"
-                                                                value={newAssetFormData.serial}
-                                                                onChange={(e) => setNewAssetFormData({ ...newAssetFormData, serial: e.target.value })}
-                                                            />
-                                                        </div>
-                                                        <div className="space-y-1.5">
-                                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Location</label>
-                                                            <select
-                                                                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500/50 transition-all outline-none"
-                                                                value={newAssetFormData.location}
-                                                                onChange={(e) => setNewAssetFormData({ ...newAssetFormData, location: e.target.value })}
-                                                            >
-                                                                <option>1st Floor</option>
-                                                                <option>2nd Floor</option>
-                                                                <option>3rd Floor</option>
-                                                                <option>4th Floor</option>
-                                                                <option>Warehouse</option>
-                                                                <option>Satellite Office</option>
-                                                            </select>
-                                                        </div>
-                                                        <div className="col-span-2 space-y-1.5">
-                                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Item Description</label>
-                                                            <textarea
-                                                                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500/50 transition-all outline-none min-h-[80px] resize-none"
-                                                                value={newAssetFormData.description}
-                                                                onChange={(e) => setNewAssetFormData({ ...newAssetFormData, description: e.target.value })}
-                                                                placeholder=""
-                                                            />
-                                                        </div>
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Type</label>
+                                                        <select
+                                                            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500/50 transition-all outline-none"
+                                                            value={newAssetFormData.type}
+                                                            onChange={(e) => setNewAssetFormData({ ...newAssetFormData, type: e.target.value })}
+                                                        >
+                                                            <option>Supplies</option>
+                                                            <option>Small Machine</option>
+                                                            <option>Electronics</option>
+                                                            <option>Furniture</option>
+                                                            <option>Computer</option>
+                                                        </select>
                                                     </div>
-                                                )}
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Manufacturer</label>
+                                                        <input
+                                                            type="text"
+                                                            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500/50 transition-all outline-none"
+                                                            value={newAssetFormData.manufacturer}
+                                                            onChange={(e) => setNewAssetFormData({ ...newAssetFormData, manufacturer: e.target.value })}
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Model</label>
+                                                        <input
+                                                            type="text"
+                                                            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500/50 transition-all outline-none"
+                                                            value={newAssetFormData.model}
+                                                            onChange={(e) => setNewAssetFormData({ ...newAssetFormData, model: e.target.value })}
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Serial #</label>
+                                                        <input
+                                                            type="text"
+                                                            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500/50 transition-all outline-none"
+                                                            value={newAssetFormData.serial}
+                                                            onChange={(e) => setNewAssetFormData({ ...newAssetFormData, serial: e.target.value })}
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Location</label>
+                                                        <select
+                                                            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500/50 transition-all outline-none"
+                                                            value={newAssetFormData.location}
+                                                            onChange={(e) => setNewAssetFormData({ ...newAssetFormData, location: e.target.value })}
+                                                        >
+                                                            <option>1st Floor</option>
+                                                            <option>2nd Floor</option>
+                                                            <option>3rd Floor</option>
+                                                            <option>4th Floor</option>
+                                                            <option>Warehouse</option>
+                                                            <option>Satellite Office</option>
+                                                        </select>
+                                                    </div>
+                                                    <div className="col-span-2 space-y-1.5">
+                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Item Description</label>
+                                                        <textarea
+                                                            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500/50 transition-all outline-none min-h-[80px] resize-none"
+                                                            value={newAssetFormData.description}
+                                                            onChange={(e) => setNewAssetFormData({ ...newAssetFormData, description: e.target.value })}
+                                                            placeholder=""
+                                                        />
+                                                    </div>
+                                                </div>
+
 
 
                                                 {/* Section: Financials */}
@@ -1674,7 +1625,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
 
                                                 {/* Section: Notes */}
                                                 <div className="space-y-1.5">
-                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Technical Maintenance Notes</label>
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Notes</label>
                                                     <textarea
                                                         className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500/50 transition-all outline-none min-h-[100px] resize-none"
                                                         value={newAssetFormData.notes}
