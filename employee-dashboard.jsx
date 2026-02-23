@@ -436,58 +436,17 @@ const EmployeeDashboard = ({ user, onLogout }) => {
     }
   };
 
-  // Fetch employees and activity logs from Supabase on mount
+  // Fetch employees and local activity logs on mount
   useEffect(() => {
     fetchEmployees();
-    fetchActivityLogs();
-
-    // Subscribe to new activity logs
-    const activitySubscription = supabase
-      .channel('activity_logs_realtime')
-      .on('postgres_changes', { event: 'INSERT', table: 'activity_logs' }, (payload) => {
-        setRecentActivity(prev => [payload.new, ...prev].slice(0, 5));
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(activitySubscription);
-    };
-  }, []);
-
-  const fetchActivityLogs = async () => {
-    // Check if Supabase is configured
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    const isConfigured = supabaseUrl && supabaseKey && !supabaseUrl.includes('your-project-url') && !supabaseKey.includes('your-anon-key');
 
     // Load from localStorage first regardless of mode (Local-First/Caching)
     const localLogs = localStorage.getItem('edp_activity_logs');
     if (localLogs) {
       setRecentActivity(JSON.parse(localLogs));
     }
+  }, []);
 
-    if (!isConfigured) {
-      console.log('Supabase not configured. Using local activity logs.');
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('activity_logs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      if (error) throw error;
-      if (data && data.length > 0) {
-        setRecentActivity(data);
-        // Sync cache
-        localStorage.setItem('edp_activity_logs', JSON.stringify(data));
-      }
-    } catch (error) {
-      console.error('Error fetching activity logs:', error.message);
-    }
-  };
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
@@ -504,7 +463,7 @@ const EmployeeDashboard = ({ user, onLogout }) => {
     }
   };
 
-  const logActivity = async (type, title, description) => {
+  const logActivity = (type, title, description) => {
     const newLog = {
       id: Date.now(), // Local temporary ID
       type,
@@ -516,28 +475,11 @@ const EmployeeDashboard = ({ user, onLogout }) => {
     // Update local state immediately for instant feedback
     setRecentActivity(prev => [newLog, ...prev].slice(0, 5));
 
-    try {
-      // Try to sync with Supabase if configured
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      const isConfigured = supabaseUrl && supabaseKey && !supabaseUrl.includes('your-project-url') && !supabaseKey.includes('your-anon-key');
-
-      if (isConfigured) {
-        const { error } = await supabase
-          .from('activity_logs')
-          .insert([{ type, title, description }]);
-
-        if (error) console.error('Error syncing log to Supabase:', error.message);
-      }
-
-      // Always update localStorage as a robust local cache
-      const localLogs = localStorage.getItem('edp_activity_logs');
-      const logs = localLogs ? JSON.parse(localLogs) : [];
-      const updatedLogs = [newLog, ...logs].slice(0, 5);
-      localStorage.setItem('edp_activity_logs', JSON.stringify(updatedLogs));
-    } catch (error) {
-      console.error('Error logging activity:', error.message);
-    }
+    // Always update localStorage as a robust local cache
+    const localLogs = localStorage.getItem('edp_activity_logs');
+    const logs = localLogs ? JSON.parse(localLogs) : [];
+    const updatedLogs = [newLog, ...logs].slice(0, 5);
+    localStorage.setItem('edp_activity_logs', JSON.stringify(updatedLogs));
   };
 
   const detectSignificantChanges = (oldData, newData) => {
@@ -625,7 +567,6 @@ const EmployeeDashboard = ({ user, onLogout }) => {
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
     if (!supabaseUrl || !supabaseKey || supabaseUrl.includes('your-project-url') || supabaseKey.includes('your-anon-key')) {
-      console.log('Supabase not configured. Using local mode.');
       return; // Use local state instead
     }
 
@@ -2234,18 +2175,46 @@ const EmployeeDashboard = ({ user, onLogout }) => {
                         >
                           <ChevronLeft className="w-5 h-5 text-slate-600 dark:text-slate-400" />
                         </button>
-                        {Array.from({ length: totalPages }, (_, i) => (
-                          <button
-                            key={i + 1}
-                            onClick={() => paginate(i + 1)}
-                            className={`w-10 h-10 rounded-lg font-semibold transition-all ${currentTablePage === i + 1
-                              ? 'bg-indigo-600 text-white shadow-lg'
-                              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-                              }`}
-                          >
-                            {i + 1}
-                          </button>
-                        ))}
+                        {(() => {
+                          const pages = [];
+                          const range = 1;
+                          for (let i = 1; i <= totalPages; i++) {
+                            if (i === 1 || i === totalPages || (i >= currentTablePage - range && i <= currentTablePage + range)) {
+                              pages.push(i);
+                            }
+                          }
+
+                          const elements = [];
+                          let lastPage = 0;
+                          for (const page of pages) {
+                            if (lastPage !== 0) {
+                              if (page - lastPage === 2) {
+                                elements.push(lastPage + 1);
+                              } else if (page - lastPage > 2) {
+                                elements.push('...');
+                              }
+                            }
+                            elements.push(page);
+                            lastPage = page;
+                          }
+
+                          return elements.map((item, i) => (
+                            typeof item === 'number' ? (
+                              <button
+                                key={i}
+                                onClick={() => paginate(item)}
+                                className={`w-10 h-10 rounded-lg font-semibold transition-all ${currentTablePage === item
+                                  ? 'bg-indigo-600 text-white shadow-lg'
+                                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                                  }`}
+                              >
+                                {item}
+                              </button>
+                            ) : (
+                              <span key={i} className="px-1 text-slate-400 dark:text-slate-500 text-xs font-black tracking-widest">...</span>
+                            )
+                          ));
+                        })()}
                         <button
                           onClick={() => setCurrentTablePage(prev => Math.min(prev + 1, totalPages))}
                           disabled={currentTablePage === totalPages}
@@ -4290,7 +4259,7 @@ const EmployeeDashboard = ({ user, onLogout }) => {
             </div>
           )
         }
-      </div >
+      </div>
     </div>
   );
 };

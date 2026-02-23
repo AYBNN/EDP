@@ -17,6 +17,12 @@ const Peso = ({ className }) => (
 
 const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" }) => {
     const isConsumables = tableName === 'consumables_inventory';
+    const getTypeOptions = () => {
+        if (tableName === 'fixed_assets_inventory') {
+            return ['Electronics', 'Furniture', 'Supplies'];
+        }
+        return ['Supplies', 'Small Machine', 'Electronics', 'Furniture', 'Computer'];
+    };
     const [assets, setAssets] = useState([]);
     const [selectedAsset, setSelectedAsset] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -111,13 +117,15 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
             setLoading(true);
             setFetchError(null);
 
-            // Log for debugging
-            console.log(`Fetching from table: ${tableName}`);
+
+            // Optimize by selecting only essential columns initially
+            // Excludes heavy columns like image_url and activity to prevent timeouts
+            const essentialColumns = 'id, name, model, manufacturer, serial, barcode, status, location, condition, type, last_adjust, notes, checked_out_date, return_due, original_cost, current_value, checked_out_to, quantity, description, created_at';
 
             const { data, error } = await supabase
                 .from(tableName)
-                .select('*')
-                .order('created_at', { ascending: false });
+                .select(essentialColumns)
+                .order('name', { ascending: true });
 
             if (error) throw error;
             setAssets((data || []).map(mapFromDB));
@@ -126,6 +134,30 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
             setFetchError(error?.message || JSON.stringify(error) || 'Unknown error');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleAssetClick = async (asset) => {
+        setSelectedAsset(asset);
+        // Lazy load heavy details if they are not already present
+        if (!asset.imageUrl && (!asset.activity || asset.activity.length === 0)) {
+            try {
+                const { data, error } = await supabase
+                    .from(tableName)
+                    .select('image_url, activity')
+                    .eq('id', asset.id)
+                    .single();
+
+                if (error) throw error;
+
+                setSelectedAsset(prev => prev && prev.id === asset.id ? {
+                    ...prev,
+                    imageUrl: data.image_url || '',
+                    activity: Array.isArray(data.activity) ? data.activity : []
+                } : prev);
+            } catch (error) {
+                console.error('Error fetching asset details:', error);
+            }
         }
     };
 
@@ -505,10 +537,10 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                 </div>
                                 <h1 className="text-3xl font-black text-slate-800 tracking-tight">{title}</h1>
                             </div>
-                            <p className="text-slate-500 mt-2 font-medium flex items-center gap-2">
+                            <div className="text-slate-500 mt-2 font-medium flex items-center gap-2">
                                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                                 System Active: Tracking {assets.length} institutional units
-                            </p>
+                            </div>
                         </div>
                         <div className="flex gap-2">
                             <button
@@ -628,7 +660,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                 <tr
                                                     key={asset.id}
                                                     className={`hover:bg-indigo-50/40 transition-all cursor-pointer group relative ${selectedAsset?.id === asset.id ? 'bg-indigo-50/60' : ''}`}
-                                                    onClick={() => setSelectedAsset(asset)}
+                                                    onClick={() => handleAssetClick(asset)}
                                                 >
                                                     <td className="px-6 py-5">
                                                         <span className="font-mono text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md w-fit">{asset.id}</span>
@@ -681,7 +713,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    setSelectedAsset(asset);
+                                                                    handleAssetClick(asset);
                                                                     setActiveTab('overview');
                                                                     setTimeout(() => {
                                                                         detailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -701,10 +733,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
 
                                 {/* Pagination Controls */}
                                 {filteredAssets.length > 0 && (
-                                    <div className="px-6 py-4 bg-slate-50/30 border-t border-slate-100 flex items-center justify-between">
-                                        <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                                            Showing <span className="text-indigo-600">{(currentPage - 1) * itemsPerPage + 1}</span> - <span className="text-indigo-600">{Math.min(currentPage * itemsPerPage, filteredAssets.length)}</span> of <span className="text-indigo-600">{filteredAssets.length}</span> units
-                                        </div>
+                                    <div className="px-6 py-6 bg-slate-50/30 border-t border-slate-100 flex flex-col items-center justify-center gap-4">
                                         <div className="flex items-center gap-2">
                                             <button
                                                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
@@ -714,18 +743,46 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                 <ChevronLeft className="w-4 h-4" />
                                             </button>
                                             <div className="flex items-center gap-1">
-                                                {[...Array(totalPages)].map((_, i) => (
-                                                    <button
-                                                        key={i + 1}
-                                                        onClick={() => setCurrentPage(i + 1)}
-                                                        className={`w-8 h-8 rounded-xl text-xs font-black transition-all ${currentPage === i + 1
-                                                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200'
-                                                            : 'bg-white text-slate-400 border border-slate-200 hover:border-indigo-200 hover:text-indigo-600'
-                                                            }`}
-                                                    >
-                                                        {i + 1}
-                                                    </button>
-                                                ))}
+                                                {(() => {
+                                                    const pages = [];
+                                                    const range = 1;
+                                                    for (let i = 1; i <= totalPages; i++) {
+                                                        if (i === 1 || i === totalPages || (i >= currentPage - range && i <= currentPage + range)) {
+                                                            pages.push(i);
+                                                        }
+                                                    }
+
+                                                    const elements = [];
+                                                    let lastPage = 0;
+                                                    for (const page of pages) {
+                                                        if (lastPage !== 0) {
+                                                            if (page - lastPage === 2) {
+                                                                elements.push(lastPage + 1);
+                                                            } else if (page - lastPage > 2) {
+                                                                elements.push('...');
+                                                            }
+                                                        }
+                                                        elements.push(page);
+                                                        lastPage = page;
+                                                    }
+
+                                                    return elements.map((item, i) => (
+                                                        typeof item === 'number' ? (
+                                                            <button
+                                                                key={i}
+                                                                onClick={() => setCurrentPage(item)}
+                                                                className={`w-8 h-8 rounded-xl text-xs font-black transition-all ${currentPage === item
+                                                                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200'
+                                                                    : 'bg-white text-slate-400 border border-slate-200 hover:border-indigo-200 hover:text-indigo-600'
+                                                                    }`}
+                                                            >
+                                                                {item}
+                                                            </button>
+                                                        ) : (
+                                                            <span key={i} className="px-1 text-slate-400 text-[10px] font-black tracking-widest">...</span>
+                                                        )
+                                                    ));
+                                                })()}
                                             </div>
                                             <button
                                                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
@@ -734,6 +791,9 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                             >
                                                 <ChevronRight className="w-4 h-4" />
                                             </button>
+                                        </div>
+                                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">
+                                            Showing <span className="text-indigo-600">{(currentPage - 1) * itemsPerPage + 1}</span> - <span className="text-indigo-600">{Math.min(currentPage * itemsPerPage, filteredAssets.length)}</span> of <span className="text-indigo-600">{filteredAssets.length}</span> units
                                         </div>
                                     </div>
                                 )}
@@ -895,7 +955,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                             value={isEditing ? editFormData.type : selectedAsset.type}
                                                             editable={isEditing}
                                                             onChange={(val) => setEditFormData({ ...editFormData, type: val })}
-                                                            options={['Consumable', 'Supplies', 'Small Machine', 'Electronics', 'Furniture', 'Computer']}
+                                                            options={getTypeOptions()}
                                                         />
                                                         <InfoField
                                                             label="Location"
@@ -1639,12 +1699,9 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                             value={newAssetFormData.type}
                                                             onChange={(e) => setNewAssetFormData({ ...newAssetFormData, type: e.target.value })}
                                                         >
-                                                            <option>Consumable</option>
-                                                            <option>Supplies</option>
-                                                            <option>Small Machine</option>
-                                                            <option>Electronics</option>
-                                                            <option>Furniture</option>
-                                                            <option>Computer</option>
+                                                            {getTypeOptions().map(opt => (
+                                                                <option key={opt} value={opt}>{opt}</option>
+                                                            ))}
                                                         </select>
                                                     </div>
                                                     <div className="space-y-1.5">

@@ -20,11 +20,14 @@ const App = () => {
     const handleLogin = (user) => {
         setCurrentUser(user);
         localStorage.setItem('edp_user', JSON.stringify(user));
+        // Reset view to dashboard on new login
+        localStorage.setItem('edp_active_view', 'dashboard');
     };
 
     const handleLogout = () => {
         setCurrentUser(null);
         localStorage.removeItem('edp_user');
+        localStorage.removeItem('edp_active_view');
     };
 
     if (loading) {
