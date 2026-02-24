@@ -21,8 +21,43 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
         if (tableName === 'fixed_assets_inventory') {
             return ['Electronics', 'Furniture', 'Supplies'];
         }
-        return ['Supplies', 'Small Machine', 'Electronics', 'Furniture', 'Computer'];
+        if (tableName === 'ppe_inventory') {
+            return ['Safety Gear', 'Uniform', 'Accessories'];
+        }
+        if (tableName === 'uniforms_inventory') {
+            return ['Polo', 'Pants', 'Jacket', 'Shoes', 'Accessories', 'Other'];
+        }
     };
+
+    // Hash-based ID formatter to ensure old integer IDs look like 7-char alphanumeric UUIDs
+    const formatId = (rawId) => {
+        if (!rawId) return '';
+        const strId = String(rawId);
+        if (strId.match(/^[0-9a-f]{8}-[0-9a-f]{4}/i)) {
+            // It's already a real UUID
+            return strId.substring(0, 7);
+        }
+        // It's a legacy integer ID. Create a deterministic pseudo-hash
+        let hash = 0;
+        for (let i = 0; i < strId.length; i++) {
+            hash = (hash << 5) - hash + strId.charCodeAt(i);
+            hash |= 0;
+        }
+        // Convert to absolute hex and pad/slice to 7 chars
+        const hex = Math.abs(hash).toString(16).padEnd(7, '0');
+        return hex.substring(0, 7);
+    };
+
+    const getDisplayId = (asset) => {
+        if (!asset) return '';
+        if (asset.barcode) {
+            const bc = String(asset.barcode).trim();
+            // If it's shorter than 7, pad it with leading zeros to maintain consistency
+            return bc.length >= 7 ? bc.substring(0, 7) : bc.padStart(7, '0');
+        }
+        return formatId(asset.id);
+    };
+
     const [assets, setAssets] = useState([]);
     const [selectedAsset, setSelectedAsset] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -36,6 +71,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
     const [showCheckoutModal, setShowCheckoutModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
+    const [isSubmittingAsset, setIsSubmittingAsset] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editFormData, setEditFormData] = useState({});
     const [newAssetFormData, setNewAssetFormData] = useState({});
@@ -273,7 +309,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
             date: new Date().toISOString().split('T')[0],
             user: 'Admin',
             action: 'Unit Details Updated',
-            status: editFormData.condition || selectedAsset?.condition,
+            status: editFormData.condition || 'Updated',
             lastAdjust: new Date().toISOString().split('T')[0]
         };
 
@@ -282,7 +318,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
             ...editFormData,
             originalCost: editFormData.originalCost === '' ? 0 : Number(editFormData.originalCost),
             currentValue: editFormData.currentValue === '' ? 0 : Number(editFormData.currentValue),
-            activity: [newActivity, ...(selectedAsset?.activity || [])]
+            activity: [newActivity, ...(Array.isArray(selectedAsset?.activity) ? selectedAsset.activity : [])]
         };
 
         try {
@@ -293,8 +329,8 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
 
             if (error) throw error;
 
-            setAssets(prev => prev.map(a => a.id === selectedAsset.id ? updatedAssetData : a));
-            setSelectedAsset(updatedAssetData);
+            setAssets(prev => prev.map(a => a.id === selectedAsset.id ? { ...updatedAssetData, id: selectedAsset.id } : a));
+            setSelectedAsset({ ...updatedAssetData, id: selectedAsset.id });
             setIsEditing(false);
         } catch (error) {
             console.error('Error updating asset:', error);
@@ -395,7 +431,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
             serial: '',
             description: '',
             barcode: '',
-            location: '1st Floor',
+            location: 'NPI Plant',
             condition: 'Excellent',
             quantity: '',
             status: 'Available',
@@ -409,9 +445,9 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
 
     const handleAddSubmit = async (e) => {
         e.preventDefault();
+        setIsSubmittingAsset(true);
         const newAssetData = {
             ...newAssetFormData,
-            id: (Math.floor(Math.random() * 9000000) + 1000000).toString(),
             originalCost: newAssetFormData.originalCost === '' ? 0 : Number(newAssetFormData.originalCost),
             currentValue: newAssetFormData.currentValue === '' ? 0 : Number(newAssetFormData.currentValue),
             activity: [
@@ -444,6 +480,8 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
         } catch (error) {
             console.error('Error adding asset:', error);
             alert(`Failed to add unit: ${error.message || 'Unknown error'}`);
+        } finally {
+            setIsSubmittingAsset(false);
         }
     };
 
@@ -663,7 +701,9 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                     onClick={() => handleAssetClick(asset)}
                                                 >
                                                     <td className="px-6 py-5">
-                                                        <span className="font-mono text-sm font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded-md w-fit">{asset.id}</span>
+                                                        <span title={asset.barcode || asset.id} className="font-mono text-sm font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded-md w-fit cursor-help">
+                                                            {getDisplayId(asset)}
+                                                        </span>
                                                     </td>
                                                     <td className="px-6 py-5">
                                                         <p className="font-bold text-sm text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:text-indigo-400 transition-colors">{asset.name}</p>
@@ -940,7 +980,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                     <div className="space-y-6">
                                                         <InfoField
                                                             label="Barcode/Item #"
-                                                            value={isEditing ? editFormData.barcode : (selectedAsset.barcode || selectedAsset.id)}
+                                                            value={isEditing ? editFormData.barcode : getDisplayId(selectedAsset)}
                                                             editable={isEditing}
                                                             onChange={(val) => setEditFormData({ ...editFormData, barcode: val })}
                                                         />
@@ -1305,7 +1345,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                             <ClipboardList className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                                         </div>
                                         <div className="max-w-[200px]">
-                                            <h2 className="text-xl font-black text-black tracking-tight leading-none uppercase">Check Out Info</h2>
+                                            <h2 className="text-xl font-black text-black dark:text-white tracking-tight leading-none uppercase">Check Out Info</h2>
                                             <p className="text-[12px] font-black text-slate-900 dark:text-white uppercase tracking-widest mt-1.5 truncate">{selectedAsset?.name}</p>
                                         </div>
                                     </div>
@@ -1328,10 +1368,10 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                         <Calendar className="w-2.5 h-2.5 text-indigo-600 dark:text-indigo-400 group-focus-within:text-white" />
                                                     </div>
                                                     <div className="flex-1">
-                                                        <label className="text-[11px] font-black text-black uppercase tracking-widest block">Check Out</label>
+                                                        <label className="text-[11px] font-black text-black dark:text-white uppercase tracking-widest block">Check Out</label>
                                                         <input
                                                             type="date"
-                                                            className="w-full bg-transparent border-none p-0 text-sm font-bold text-black focus:ring-0 outline-none cursor-pointer"
+                                                            className="w-full bg-transparent border-none p-0 text-sm font-bold text-black dark:text-white focus:ring-0 outline-none cursor-pointer [color-scheme:light] dark:[color-scheme:dark]"
                                                             value={checkoutFormData.checkOutDate}
                                                             onChange={(e) => setCheckoutFormData({ ...checkoutFormData, checkOutDate: e.target.value })}
                                                         />
@@ -1344,10 +1384,10 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                         <Clock className="w-2.5 h-2.5 text-rose-500 group-focus-within:text-white" />
                                                     </div>
                                                     <div className="flex-1">
-                                                        <label className="text-[11px] font-black text-black uppercase tracking-widest block">Return Date <span className="text-[9px] opacity-50 ml-1 lowercase font-bold">(Optional)</span></label>
+                                                        <label className="text-[11px] font-black text-black dark:text-white uppercase tracking-widest block">Return Date <span className="text-[9px] opacity-50 ml-1 lowercase font-bold">(Optional)</span></label>
                                                         <input
                                                             type="date"
-                                                            className="w-full bg-transparent border-none p-0 text-sm font-bold text-black focus:ring-0 outline-none cursor-pointer"
+                                                            className="w-full bg-transparent border-none p-0 text-sm font-bold text-black dark:text-white focus:ring-0 outline-none cursor-pointer [color-scheme:light] dark:[color-scheme:dark]"
                                                             value={checkoutFormData.returnDue}
                                                             onChange={(e) => setCheckoutFormData({ ...checkoutFormData, returnDue: e.target.value })}
                                                         />
@@ -1364,11 +1404,11 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                         <User className="w-2.5 h-2.5 text-amber-500 group-focus-within:text-white" />
                                                     </div>
                                                     <div className="flex-1">
-                                                        <label className="text-[11px] font-black text-black uppercase tracking-widest block">Check out by:</label>
+                                                        <label className="text-[11px] font-black text-black dark:text-white uppercase tracking-widest block">Check out by:</label>
                                                         <input
                                                             type="text"
                                                             placeholder=""
-                                                            className="w-full bg-transparent border-none p-0 text-sm font-bold text-black focus:ring-0 outline-none placeholder:text-slate-400 dark:text-slate-500"
+                                                            className="w-full bg-transparent border-none p-0 text-sm font-bold text-black dark:text-white focus:ring-0 outline-none placeholder:text-slate-400 dark:text-slate-500"
                                                             value={checkoutFormData.checkedOutBy}
                                                             onChange={(e) => setCheckoutFormData({ ...checkoutFormData, checkedOutBy: e.target.value })}
                                                         />
@@ -1381,14 +1421,14 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                         <MapPin className="w-2.5 h-2.5 text-indigo-600 dark:text-indigo-400 group-focus-within:text-white" />
                                                     </div>
                                                     <div className="flex-1 relative" ref={jobsiteDropdownRef}>
-                                                        <label className="text-[11px] font-black text-black uppercase tracking-widest block">Jobsite/Area</label>
+                                                        <label className="text-[11px] font-black text-black dark:text-white uppercase tracking-widest block">Jobsite/Area</label>
                                                         <div className="relative mt-1">
                                                             <button
                                                                 type="button"
                                                                 onClick={() => setShowJobsiteDropdown(!showJobsiteDropdown)}
-                                                                className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl px-0 py-1.5 text-xs font-bold text-black focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500/50 transition-all outline-none flex items-center justify-between group/js cursor-pointer"
+                                                                className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl px-0 py-1.5 text-xs font-bold text-black dark:text-white focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500/50 transition-all outline-none flex items-center justify-between group/js cursor-pointer"
                                                             >
-                                                                <span className={!checkoutFormData.jobsite ? 'text-slate-400 dark:text-slate-500' : 'text-black'}>
+                                                                <span className={!checkoutFormData.jobsite ? 'text-slate-400 dark:text-slate-500' : 'text-black dark:text-white'}>
                                                                     {checkoutFormData.jobsite || 'Select Location'}
                                                                 </span>
                                                                 <ChevronDown className={`w-3.5 h-3.5 text-slate-400 dark:text-slate-500 transition-all duration-300 ${showJobsiteDropdown ? 'rotate-180 text-indigo-600 dark:text-indigo-400' : 'group-hover/js:text-indigo-400'}`} />
@@ -1434,12 +1474,12 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                             <Hash className="w-2.5 h-2.5 text-indigo-600 dark:text-indigo-400 group-focus-within:text-white" />
                                                         </div>
                                                         <div className="flex-1 text-center">
-                                                            <label className="text-[11px] font-black text-black uppercase tracking-widest block">Quantity</label>
+                                                            <label className="text-[11px] font-black text-black dark:text-white uppercase tracking-widest block">Quantity</label>
                                                             <input
                                                                 type="number"
                                                                 min="1"
                                                                 max={selectedAsset.quantity}
-                                                                className="w-full bg-transparent border-none p-0 text-sm font-bold text-black focus:ring-0 outline-none text-center"
+                                                                className="w-full bg-transparent border-none p-0 text-sm font-bold text-black dark:text-white focus:ring-0 outline-none text-center"
                                                                 value={checkoutFormData.quantity}
                                                                 onChange={(e) => setCheckoutFormData({ ...checkoutFormData, quantity: e.target.value })}
                                                                 onKeyDown={(e) => ['e', 'E', '+', '-'].includes(e.key) && e.preventDefault()}
@@ -1457,9 +1497,9 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                             </div>
                                             <div className="relative z-10">
                                                 <div className="flex items-center gap-2 mb-2">
-                                                    <div className="h-px w-4 bg-black/10" />
-                                                    <span className="text-[11px] font-black text-black uppercase tracking-[0.3em]">Check out Details</span>
-                                                    <div className="h-px flex-1 bg-black/10" />
+                                                    <div className="h-px w-4 bg-black/10 dark:bg-white/10" />
+                                                    <span className="text-[11px] font-black text-black dark:text-white uppercase tracking-[0.3em]">Check out Details</span>
+                                                    <div className="h-px flex-1 bg-black/10 dark:bg-white/10" />
                                                 </div>
                                                 <div className="space-y-2">
                                                     <div className="relative group overflow-hidden rounded-xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-2 transition-all focus-within:ring-2 focus-within:ring-indigo-500/5 focus-within:border-indigo-500/30 focus-within:bg-white dark:bg-slate-900">
@@ -1468,11 +1508,11 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                                 <User className="w-2.5 h-2.5 text-slate-400 dark:text-slate-500 group-focus-within:text-white" />
                                                             </div>
                                                             <div className="flex-1">
-                                                                <label className="text-[10px] font-black text-black uppercase tracking-widest block">Name</label>
+                                                                <label className="text-[10px] font-black text-black dark:text-white uppercase tracking-widest block">Name</label>
                                                                 <input
                                                                     type="text"
                                                                     placeholder=""
-                                                                    className="w-full bg-transparent border-none p-0 text-sm font-bold text-black focus:ring-0 outline-none placeholder:text-slate-400 dark:text-slate-500"
+                                                                    className="w-full bg-transparent border-none p-0 text-sm font-bold text-black dark:text-white focus:ring-0 outline-none placeholder:text-slate-400 dark:text-slate-500"
                                                                     value={checkoutFormData.name}
                                                                     onChange={(e) => setCheckoutFormData({ ...checkoutFormData, name: e.target.value })}
                                                                 />
@@ -1486,11 +1526,11 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                                     <Package className="w-2.5 h-2.5 text-slate-400 dark:text-slate-500 group-focus-within:text-white" />
                                                                 </div>
                                                                 <div className="flex-1 min-w-0">
-                                                                    <label className="text-[10px] font-black text-black uppercase tracking-widest block">Email</label>
+                                                                    <label className="text-[10px] font-black text-black dark:text-white uppercase tracking-widest block">Email</label>
                                                                     <input
                                                                         type="email"
                                                                         placeholder=""
-                                                                        className="w-full bg-transparent border-none p-0 text-[12px] font-bold text-black focus:ring-0 outline-none placeholder:text-slate-400 dark:text-slate-500 truncate"
+                                                                        className="w-full bg-transparent border-none p-0 text-[12px] font-bold text-black dark:text-white focus:ring-0 outline-none placeholder:text-slate-400 dark:text-slate-500 truncate"
                                                                         value={checkoutFormData.email}
                                                                         onChange={(e) => setCheckoutFormData({ ...checkoutFormData, email: e.target.value })}
                                                                     />
@@ -1503,13 +1543,13 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                                     <MapPin className="w-2.5 h-2.5 text-slate-400 dark:text-slate-500 group-focus-within:text-white" />
                                                                 </div>
                                                                 <div className="flex-1 min-w-0">
-                                                                    <label className="text-[10px] font-black text-black uppercase tracking-widest block">Phone</label>
+                                                                    <label className="text-[10px] font-black text-black dark:text-white uppercase tracking-widest block">Phone</label>
                                                                     <input
                                                                         type="tel"
                                                                         placeholder=""
                                                                         maxLength="11"
                                                                         inputMode="numeric"
-                                                                        className="w-full bg-transparent border-none p-0 text-[12px] font-bold text-black focus:ring-0 outline-none placeholder:text-slate-400 dark:text-slate-500 truncate"
+                                                                        className="w-full bg-transparent border-none p-0 text-[12px] font-bold text-black dark:text-white focus:ring-0 outline-none placeholder:text-slate-400 dark:text-slate-500 truncate"
                                                                         value={checkoutFormData.phone}
                                                                         onChange={(e) => {
                                                                             const val = e.target.value.replace(/\D/g, '');
@@ -1529,9 +1569,9 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
 
                                     <button
                                         type="submit"
-                                        className="w-full py-4 px-6 bg-slate-900 text-white rounded-2xl text-[13px] font-black shadow-xl hover:bg-black transition-all hover:-translate-y-0.5 active:scale-95 active:translate-y-0 uppercase tracking-[0.2em] relative overflow-hidden group"
+                                        className="w-full py-4 px-6 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-2xl text-[13px] font-black shadow-xl hover:bg-black dark:hover:bg-white transition-all hover:-translate-y-0.5 active:scale-95 active:translate-y-0 uppercase tracking-[0.2em] relative overflow-hidden group"
                                     >
-                                        <div className="absolute inset-0 bg-gradient-to-r from-white/10 via-transparent to-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        <div className="absolute inset-0 bg-gradient-to-r from-white/10 dark:from-black/10 via-transparent to-white/10 dark:to-black/10 opacity-0 group-hover:opacity-100 transition-opacity" />
                                         <span className="relative z-10 flex items-center justify-center gap-2">
                                             Checkout <ChevronRight className="w-5 h-5" />
                                         </span>
@@ -1587,7 +1627,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                 <div className="p-3.5 px-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <div>
-                                            <h2 className="text-xl font-black text-black tracking-tight leading-none uppercase">Create New Unit</h2>
+                                            <h2 className="text-xl font-black text-black dark:text-white tracking-tight leading-none uppercase">Create New Unit</h2>
                                         </div>
                                     </div>
                                     <button
@@ -1811,9 +1851,10 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                         </button>
                                         <button
                                             type="submit"
-                                            className="flex-[2] py-4 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-black shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2"
+                                            disabled={isSubmittingAsset}
+                                            className="flex-[2] py-4 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-black dark:hover:bg-white shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                                         >
-                                            Create Unit<ChevronRight className="w-4 h-4" />
+                                            {isSubmittingAsset ? 'Processing..' : 'Create Unit'}{!isSubmittingAsset && <ChevronRight className="w-4 h-4" />}
                                         </button>
                                     </div>
                                 </form>
