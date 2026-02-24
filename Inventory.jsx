@@ -16,7 +16,8 @@ const Peso = ({ className }) => (
 );
 
 const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" }) => {
-    const isConsumables = tableName === 'consumables_inventory';
+    // Treat PPE and Uniforms identical to Consumables (tracked by numeric quantity, disable checkout on 0 quantity)
+    const isConsumables = ['consumables_inventory', 'ppe_inventory', 'uniforms_inventory'].includes(tableName);
     const getTypeOptions = () => {
         if (tableName === 'fixed_assets_inventory') {
             return ['Electronics', 'Furniture', 'Supplies'];
@@ -27,6 +28,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
         if (tableName === 'uniforms_inventory') {
             return ['Polo', 'Pants', 'Jacket', 'Shoes', 'Accessories', 'Other'];
         }
+        return ['Supplies', 'Small Machine', 'Electronics', 'Furniture', 'Computer'];
     };
 
     // Hash-based ID formatter to ensure old integer IDs look like 7-char alphanumeric UUIDs
@@ -87,6 +89,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
     });
     const [loading, setLoading] = useState(true);
     const [fetchError, setFetchError] = useState(null);
+    const [isFetchingDetails, setIsFetchingDetails] = useState(false);
     const [showJobsiteDropdown, setShowJobsiteDropdown] = useState(false);
     const [showFullHistory, setShowFullHistory] = useState(false);
     const detailsRef = useRef(null);
@@ -178,6 +181,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
         // Lazy load heavy details if they are not already present
         if (!asset.imageUrl && (!asset.activity || asset.activity.length === 0)) {
             try {
+                setIsFetchingDetails(true);
                 const { data, error } = await supabase
                     .from(tableName)
                     .select('image_url, activity')
@@ -193,6 +197,8 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                 } : prev);
             } catch (error) {
                 console.error('Error fetching asset details:', error);
+            } finally {
+                setIsFetchingDetails(false);
             }
         }
     };
@@ -619,7 +625,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                         <div className="relative w-full md:w-72">
                                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
                                             <input
-                                                className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-sm"
+                                                className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-sm"
                                                 placeholder="Search Unit"
                                                 value={searchQuery}
                                                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -873,7 +879,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                             <>
                                                 <button
                                                     onClick={handleEditSubmit}
-                                                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200">
+                                                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 [text-shadow:_-1px_0_cyan,_1px_0_red]">
                                                     <Check className="w-4 h-4" /> Save Changes
                                                 </button>
                                                 <button
@@ -886,7 +892,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                             <>
                                                 <button
                                                     onClick={handleEditClick}
-                                                    className="flex items-center gap-2 px-4 py-2 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl font-bold text-sm hover:bg-indigo-100 transition-all border border-indigo-100 dark:border-indigo-500/20">
+                                                    className="flex items-center gap-2 px-4 py-2 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl font-bold text-sm hover:bg-indigo-100 transition-all border border-indigo-100 dark:border-indigo-500/20 [text-shadow:_-1px_0_cyan,_1px_0_red]">
                                                     <Pencil className="w-4 h-4" /> Edit Unit
                                                 </button>
                                                 <button
@@ -1055,7 +1061,12 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                         accept="image/*"
                                                         onChange={handleImageChange}
                                                     />
-                                                    {(isEditing ? editFormData.imageUrl : selectedAsset.imageUrl) ? (
+                                                    {isFetchingDetails ? (
+                                                        <div className="flex flex-col items-center gap-3 animate-in fade-in duration-300">
+                                                            <div className="w-10 h-10 border-4 border-slate-200 dark:border-slate-700 border-t-indigo-600 dark:border-t-indigo-400 rounded-full animate-spin" />
+                                                            <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Loading Image...</span>
+                                                        </div>
+                                                    ) : (isEditing ? editFormData.imageUrl : selectedAsset.imageUrl)?.length > 10 ? (
                                                         <img
                                                             src={isEditing ? editFormData.imageUrl : selectedAsset.imageUrl}
                                                             alt={selectedAsset.name}
