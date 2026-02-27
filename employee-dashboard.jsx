@@ -341,9 +341,7 @@ const EmployeeDashboard = ({ user, onLogout }) => {
   const [inventoryPinInput, setInventoryPinInput] = useState('');
   const [inventoryPinError, setInventoryPinError] = useState(false);
   const [isInventoryAuthorized, setIsInventoryAuthorized] = useState(false);
-  const [inventoryPin, setInventoryPin] = useState(() => {
-    return localStorage.getItem('edp_inventory_pin') || '1234';
-  });
+  const [inventoryPin, setInventoryPin] = useState('1234');
 
   // Change PIN Form State
   const [pinCurrent, setPinCurrent] = useState('');
@@ -368,6 +366,103 @@ const EmployeeDashboard = ({ user, onLogout }) => {
       localStorage.setItem('edp_theme', 'light');
     }
   }, [isDarkMode]);
+
+  const fetchInventoryPin = async () => {
+    if (!user) return;
+    try {
+      let dbUserId = user.id;
+
+      // Fallback: If no ID, get it from profiles table using username
+      if (!dbUserId && user.username) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('username', user.username)
+          .single();
+        dbUserId = profile?.id;
+      }
+
+      if (!dbUserId) return;
+
+      const { data, error } = await supabase
+        .from('inventory_pins')
+        .select('pin_code')
+        .eq('user_id', dbUserId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching PIN:', error.message);
+        return;
+      }
+
+      if (data?.pin_code) {
+        setInventoryPin(data.pin_code);
+      }
+    } catch (error) {
+      console.error('Error in fetchInventoryPin:', error.message);
+    }
+  };
+
+  useEffect(() => {
+    fetchInventoryPin();
+  }, [user?.id]);
+
+  const handlePinSubmit = async (e) => {
+    e.preventDefault();
+    if (pinLoading) return;
+
+    if (pinCurrent !== inventoryPin) {
+      setPinMessage({ type: 'error', text: 'Current PIN is incorrect' });
+      return;
+    }
+
+    if (pinNew !== pinConfirm) {
+      setPinMessage({ type: 'error', text: 'New PIN and confirm do not match' });
+      return;
+    }
+
+    if (pinNew.length !== 4) {
+      setPinMessage({ type: 'error', text: 'PIN must be 4 digits' });
+      return;
+    }
+
+    setPinLoading(true);
+    try {
+      let dbUserId = user.id;
+
+      // Fallback for ID resolution
+      if (!dbUserId && user.username) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('username', user.username)
+          .single();
+        dbUserId = profile?.id;
+      }
+
+      if (!dbUserId) throw new Error('User identification failed');
+
+      const { error } = await supabase
+        .from('inventory_pins')
+        .upsert({
+          user_id: dbUserId,
+          pin_code: pinNew
+        }, { onConflict: 'user_id' });
+
+      if (error) throw error;
+
+      setInventoryPin(pinNew);
+      setPinMessage({ type: 'success', text: 'PIN updated successfully' });
+      setPinCurrent('');
+      setPinNew('');
+      setPinConfirm('');
+    } catch (error) {
+      console.error('Error updating PIN:', error.message);
+      setPinMessage({ type: 'error', text: `Failed: ${error.message}` });
+    } finally {
+      setPinLoading(false);
+    }
+  };
 
   const totalEmployees = employees.length;
   const activeEmployees = employees.filter(emp => emp.status === 'Active').length;
@@ -467,37 +562,6 @@ const EmployeeDashboard = ({ user, onLogout }) => {
     }
   };
 
-  const handlePinSubmit = (e) => {
-    e.preventDefault();
-    setPinMessage(null);
-    if (pinCurrent !== inventoryPin) {
-      setPinMessage({ type: 'error', text: 'Current PIN is incorrect.' });
-      return;
-    }
-    if (pinNew !== pinConfirm) {
-      setPinMessage({ type: 'error', text: 'New PINs do not match.' });
-      return;
-    }
-    if (pinNew.length !== 4 || !/^\d+$/.test(pinNew)) {
-      setPinMessage({ type: 'error', text: 'New PIN must be exactly 4 digits.' });
-      return;
-    }
-    handlePinChange();
-  };
-
-  const handlePinChange = () => {
-    setPinLoading(true);
-    try {
-      setInventoryPin(pinNew);
-      localStorage.setItem('edp_inventory_pin', pinNew);
-      setPinMessage({ type: 'success', text: 'Inventory PIN updated successfully!' });
-      setPinCurrent(''); setPinNew(''); setPinConfirm('');
-    } catch (err) {
-      setPinMessage({ type: 'error', text: 'Failed to update PIN.' });
-    } finally {
-      setPinLoading(false);
-    }
-  };
 
   // Fetch employees and local activity logs on mount
   useEffect(() => {
