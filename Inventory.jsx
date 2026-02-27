@@ -92,6 +92,14 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
     const [isFetchingDetails, setIsFetchingDetails] = useState(false);
     const [showJobsiteDropdown, setShowJobsiteDropdown] = useState(false);
     const [showFullHistory, setShowFullHistory] = useState(false);
+
+    const handlePrintHistory = () => {
+        const originalTitle = document.title;
+        const reportDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        document.title = `Service_History_${selectedAsset.name.replace(/\s+/g, '_')}_${reportDate.replace(/\s+/g, '_')}`;
+        window.print();
+        document.title = originalTitle;
+    };
     const detailsRef = useRef(null);
     const jobsiteDropdownRef = useRef(null);
 
@@ -212,8 +220,8 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
 
     const stats = {
         total: assets?.length || 0,
-        available: assets?.filter(a => a?.status === 'Available' && !(a?.quantity === 0 && tableName === 'consumables_inventory')).length || 0,
-        checkedOut: assets?.filter(a => a?.status === 'Checked Out' || a?.status === 'Out of Stock' || (a?.quantity === 0 && tableName === 'consumables_inventory')).length || 0,
+        available: assets?.filter(a => a?.status === 'Available' && !(a?.quantity === 0 && isConsumables)).length || 0,
+        checkedOut: assets?.filter(a => a?.status === 'Checked Out' || a?.status === 'Out of Stock' || (a?.quantity === 0 && isConsumables)).length || 0,
         maintenance: assets?.filter(a => a?.status === 'Broken' || a?.status === 'In Repair').length || 0
     };
 
@@ -271,7 +279,13 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                         const jobPart = checkoutFormData.jobsite ? `at ${checkoutFormData.jobsite}` : '';
                         return [`Checked out`, qtyPart, namePart, jobPart].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim() || 'Checked out';
                     })(),
-                    status: newStatus
+                    status: newStatus,
+                    personName: checkoutFormData.name,
+                    email: checkoutFormData.email,
+                    phone: checkoutFormData.phone,
+                    checkOutDate: checkoutFormData.checkOutDate,
+                    returnDate: checkoutFormData.returnDue,
+                    jobsite: checkoutFormData.jobsite
                 },
                 ...(selectedAsset?.activity || [])
             ]
@@ -383,7 +397,13 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                     date: new Date().toISOString().split('T')[0],
                     user: 'Admin',
                     action: 'Unit Returned to Inventory',
-                    status: 'Available'
+                    status: 'Available',
+                    personName: selectedAsset.checkedOutTo?.name,
+                    email: selectedAsset.checkedOutTo?.email,
+                    phone: selectedAsset.checkedOutTo?.phone,
+                    checkOutDate: selectedAsset.checkedOutDate,
+                    returnDate: new Date().toISOString().split('T')[0],
+                    jobsite: selectedAsset.checkedOutTo?.jobsite
                 },
                 ...(selectedAsset?.activity || [])
             ]
@@ -717,7 +737,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                     <td className="px-6 py-5">
                                                         <div className="flex flex-col gap-1.5">
                                                             {(() => {
-                                                                const effectiveStatus = (asset.quantity === 0 && tableName === 'consumables_inventory') ? 'Out of Stock' : asset.status;
+                                                                const effectiveStatus = (asset.quantity === 0 && isConsumables) ? 'Out of Stock' : asset.status;
                                                                 return (
                                                                     <span className={`text-xs font-black uppercase tracking-wider w-fit flex items-center gap-1.5 ${getStatusColor(effectiveStatus, asset)}`}>
                                                                         <div className={`w-1.5 h-1.5 rounded-full ${effectiveStatus === 'Available' ? 'bg-emerald-500' : 'bg-current'}`} />
@@ -863,8 +883,8 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                         <div className="min-w-0">
                                             <div className="flex flex-wrap items-center gap-3 mb-1">
                                                 <h2 className="text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight leading-tight">{selectedAsset.name}</h2>
-                                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ring-4 ring-white shadow-sm flex-shrink-0 ${getStatusColor(selectedAsset.status)}`}>
-                                                    {selectedAsset.status}
+                                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ring-4 ring-white shadow-sm flex-shrink-0 ${getStatusColor(selectedAsset.status, selectedAsset)}`}>
+                                                    {(selectedAsset.quantity === 0 && isConsumables) ? 'Out of Stock' : selectedAsset.status}
                                                 </span>
                                             </div>
                                             <p className="text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest text-xs flex items-center gap-2">
@@ -1086,17 +1106,17 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                     )}
                                                 </div>
 
-                                                <div className={`mt-6 p-5 rounded-2xl border-2 border-dashed transition-all ${['Checked Out', 'Out of Stock'].includes(selectedAsset.status)
+                                                <div className={`mt-6 p-5 rounded-2xl border-2 border-dashed transition-all ${((selectedAsset.quantity === 0 && isConsumables) || ['Checked Out', 'Out of Stock'].includes(selectedAsset.status))
                                                     ? 'bg-blue-50/50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30'
                                                     : 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30'
                                                     }`}>
-                                                    {['Checked Out', 'Out of Stock'].includes(selectedAsset.status) || (selectedAsset.quantity === 0 && tableName === 'consumables_inventory') ? (
+                                                    {((selectedAsset.quantity === 0 && isConsumables) || ['Checked Out', 'Out of Stock'].includes(selectedAsset.status)) ? (
                                                         <div className="space-y-4">
                                                             <div className="flex items-center justify-between">
-                                                                <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">{selectedAsset.status === 'Out of Stock' || selectedAsset.quantity === 0 ? 'Stock Depleted' : 'Custody Status'}</p>
+                                                                <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">{(selectedAsset.status === 'Out of Stock' || (selectedAsset.quantity === 0 && isConsumables)) ? 'Stock Depleted' : 'Custody Status'}</p>
                                                                 <div className="flex items-center gap-1.5">
                                                                     <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                                                                    <span className="text-[10px] font-bold text-blue-500 uppercase">{selectedAsset.status === 'Out of Stock' || selectedAsset.quantity === 0 ? 'Empty' : 'Live'}</span>
+                                                                    <span className="text-[10px] font-bold text-blue-500 uppercase">{(selectedAsset.status === 'Out of Stock' || (selectedAsset.quantity === 0 && isConsumables)) ? 'Empty' : 'Live'}</span>
                                                                 </div>
                                                             </div>
                                                             <div className="flex items-center gap-3">
@@ -1132,13 +1152,13 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                                                 <button
                                                                     onClick={handleReturnSubmit}
                                                                     disabled={selectedAsset.status === 'Out of Stock' || (selectedAsset.quantity === 0 && isConsumables)}
-                                                                    className={`w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 group/btn shadow-lg ${selectedAsset.status === 'Out of Stock' || (selectedAsset.quantity === 0 && isConsumables)
+                                                                    className={`w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 group/btn shadow-lg ${(selectedAsset.status === 'Out of Stock' || (selectedAsset.quantity === 0 && isConsumables))
                                                                         ? 'bg-rose-600 text-white cursor-not-allowed border-none shadow-rose-200'
                                                                         : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200'
                                                                         }`}
                                                                 >
                                                                     <CheckCircle2 className="w-3.5 h-3.5 group-hover/btn:scale-110 transition-transform" />
-                                                                    {selectedAsset.status === 'Out of Stock' || (selectedAsset.quantity === 0 && isConsumables) ? 'Out of Stock' : 'Mark as Returned'}
+                                                                    {(selectedAsset.status === 'Out of Stock' || (selectedAsset.quantity === 0 && isConsumables)) ? 'Out of Stock' : 'Mark as Returned'}
                                                                 </button>
                                                             </div>
                                                         </div>
@@ -1279,6 +1299,20 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
 
                                 {activeTab === 'history' && (
                                     <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h3 className="text-slate-800 dark:text-slate-100 font-black text-sm uppercase tracking-[0.2em] flex items-center gap-2">
+                                                <div className="w-1.5 h-4 bg-indigo-600 rounded-full" />
+                                                Log Details
+                                            </h3>
+                                            <button
+                                                onClick={handlePrintHistory}
+                                                className="p-2.5 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl hover:bg-indigo-100 transition-all border border-indigo-100 dark:border-indigo-500/20 flex items-center gap-2 font-black text-[10px] uppercase tracking-widest no-print"
+                                                title="Print Service History"
+                                            >
+                                                <Printer className="w-4 h-4" />
+                                                Print Report
+                                            </button>
+                                        </div>
                                         <div className="max-w-4xl relative ml-6">
                                             <div className="absolute left-[23px] top-0 bottom-0 w-0.5 bg-slate-100 dark:bg-slate-800" />
                                             <div className="space-y-8 relative">
@@ -1874,8 +1908,147 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                         , document.body)
                 }
 
+                {/* Print History Report Template */}
+                {selectedAsset && (
+                    <div id="print-history-report" className="hidden print:block fixed inset-0 bg-white z-[99999] p-[20mm] overflow-y-auto">
+                        <style>{`
+                            @media print {
+                                body * { visibility: hidden !important; }
+                                #print-history-report, #print-history-report * { visibility: visible !important; }
+                                #print-history-report { 
+                                    position: absolute !important; 
+                                    left: 0 !important; 
+                                    top: 0 !important; 
+                                    width: 100% !important; 
+                                    height: auto !important;
+                                    display: block !important;
+                                    background: white !important;
+                                    padding: 20mm !important;
+                                    color: black !important;
+                                }
+                                .no-print { display: none !important; }
+                                @page { size: auto; margin: 0; }
+                            }
+                        `}</style>
+
+                        {/* Header */}
+                        <div className="flex justify-between items-end border-b-2 border-slate-900 pb-8 mb-10">
+                            <div className="flex items-center gap-6">
+                                <img src="/logo.jpg" alt="EDP Logo" className="w-24 h-24 object-contain shadow-sm rounded-lg" />
+                                <div>
+                                    <div className="flex items-center gap-4 mb-2">
+                                        <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Unit Service History Report</h1>
+                                    </div>
+                                    <div className="space-y-1 text-left">
+                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Inventory Management System</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Unit Info Card */}
+                        <div className="bg-slate-50 rounded-2xl p-8 mb-10 border border-slate-200">
+                            <div className="flex items-center gap-10">
+                                {selectedAsset.imageUrl && (
+                                    <div className="w-28 h-28 rounded-xl overflow-hidden border-2 border-slate-200 bg-white shadow-sm flex-shrink-0">
+                                        <img src={selectedAsset.imageUrl} alt={selectedAsset.name} className="w-full h-full object-cover" />
+                                    </div>
+                                )}
+                                <div className="flex-1 grid grid-cols-12 gap-2 items-stretch">
+                                    <div className="col-span-5 pr-6 border-r border-slate-200">
+                                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Unit Information</p>
+                                        <h2 className="text-2xl font-black text-slate-900 leading-tight mb-3">{selectedAsset.name}</h2>
+                                        <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                            <div className="flex items-center gap-1.5">
+                                                <Hash className="w-3.5 h-3.5 text-slate-400" />
+                                                <span className="text-xs font-bold text-slate-500 uppercase tracking-tight">ID: {getDisplayId(selectedAsset)}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <Tag className="w-3.5 h-3.5 text-slate-400" />
+                                                <span className="text-xs font-bold text-slate-500 uppercase tracking-tight">{selectedAsset.type || 'N/A'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="col-span-4 px-6 border-r border-slate-200">
+                                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Current Status</p>
+                                        <p className={`text-base font-black uppercase whitespace-nowrap ${getStatusColor(selectedAsset.status, selectedAsset)}`}>
+                                            {selectedAsset.status}
+                                        </p>
+                                    </div>
+                                    <div className="col-span-3 pl-6 text-left">
+                                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Location</p>
+                                        <p className="text-base font-black text-slate-900 leading-tight">
+                                            {selectedAsset.location || 'N/A'}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* History Table */}
+                        <div className="mb-12">
+                            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                <div className="w-1.5 h-4 bg-slate-900 rounded-full" />
+                                Complete Activity Log
+                            </h3>
+                            <table className="w-full border-collapse border border-slate-400">
+                                <thead>
+                                    <tr className="bg-slate-50">
+                                        <th className="py-4 px-2 text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] border border-slate-400">Check Out by:</th>
+                                        <th className="py-4 px-2 text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] border border-slate-400">Email</th>
+                                        <th className="py-4 px-2 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] border border-slate-400">Phone</th>
+                                        <th className="py-4 px-2 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] border border-slate-400">Check Out Date</th>
+                                        <th className="py-4 px-2 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] border border-slate-400">Return Date</th>
+                                        <th className="py-4 px-2 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] border border-slate-400">Jobsite/Area</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {(() => {
+                                        const filteredHistory = (selectedAsset.activity || []).filter(item => {
+                                            // Only keep rows that have at least some custody-related data
+                                            const hasStructured = item.personName || item.jobsite || item.checkOutDate || item.returnDate;
+                                            const hasParsed = (item.action.match(/to (.*?) at/) || item.action.match(/to (.*)/))?.[1] || item.action.match(/at (.*)/)?.[1];
+                                            const isCustodyEvent = item.action.startsWith('Checked out') || item.action.includes('Returned') || item.action.includes('Out of Stock');
+                                            return hasStructured || hasParsed || isCustodyEvent;
+                                        });
+
+                                        if (filteredHistory.length === 0) {
+                                            return (
+                                                <tr>
+                                                    <td colSpan="6" className="py-10 text-center text-slate-400 font-bold italic border border-slate-400">No history records found for this unit.</td>
+                                                </tr>
+                                            );
+                                        }
+
+                                        return filteredHistory.map((item, i) => {
+                                            // Parsing logic for old records or structured data for new ones
+                                            const personName = item.personName || (item.action.match(/to (.*?) at/) || item.action.match(/to (.*)/))?.[1] || '-';
+                                            const jobsite = item.jobsite || item.action.match(/at (.*)/)?.[1] || '-';
+                                            const email = item.email || '-';
+                                            const phone = item.phone || '-';
+                                            const checkOutDate = item.checkOutDate || (item.action.startsWith('Checked out') ? item.date : '-');
+                                            const returnDate = item.returnDate || (item.action.includes('Returned') ? item.date : '-');
+
+                                            return (
+                                                <tr key={i} className="text-[11px] text-left">
+                                                    <td className="py-4 px-2 font-black text-slate-900 border border-slate-400">{personName}</td>
+                                                    <td className="py-4 px-2 font-bold text-slate-600 truncate max-w-[120px] border border-slate-400">{email}</td>
+                                                    <td className="py-4 px-2 font-bold text-slate-600 whitespace-nowrap border border-slate-400">{phone}</td>
+                                                    <td className="py-4 px-2 font-bold text-slate-600 whitespace-nowrap border border-slate-400">{checkOutDate}</td>
+                                                    <td className="py-4 px-2 font-bold text-slate-600 whitespace-nowrap border border-slate-400">{returnDate}</td>
+                                                    <td className="py-4 px-2 font-black text-slate-800 border border-slate-400">{jobsite}</td>
+                                                </tr>
+                                            );
+                                        });
+                                    })()}
+                                </tbody>
+                            </table>
+                        </div>
+
+                    </div>
+                )}
             </>
-        </div >
+        </div>
     );
 };
 

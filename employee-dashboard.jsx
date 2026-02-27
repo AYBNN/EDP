@@ -337,6 +337,24 @@ const EmployeeDashboard = ({ user, onLogout }) => {
   const [showPwConfirm, setShowPwConfirm] = useState(false);
   const [showPwConfirmModal, setShowPwConfirmModal] = useState(false);
   const [inventoryDropdownOpen, setInventoryDropdownOpen] = useState(false);
+  const [showInventoryPinModal, setShowInventoryPinModal] = useState(false);
+  const [inventoryPinInput, setInventoryPinInput] = useState('');
+  const [inventoryPinError, setInventoryPinError] = useState(false);
+  const [isInventoryAuthorized, setIsInventoryAuthorized] = useState(false);
+  const [inventoryPin, setInventoryPin] = useState(() => {
+    return localStorage.getItem('edp_inventory_pin') || '1234';
+  });
+
+  // Change PIN Form State
+  const [pinCurrent, setPinCurrent] = useState('');
+  const [pinNew, setPinNew] = useState('');
+  const [pinConfirm, setPinConfirm] = useState('');
+  const [pinLoading, setPinLoading] = useState(false);
+  const [pinMessage, setPinMessage] = useState(null);
+  const [showPinCurrent, setShowPinCurrent] = useState(false);
+  const [showPinNew, setShowPinNew] = useState(false);
+  const [showPinConfirm, setShowPinConfirm] = useState(false);
+
   const [isDarkMode, setIsDarkMode] = useState(() => {
     return localStorage.getItem('edp_theme') === 'dark';
   });
@@ -446,6 +464,38 @@ const EmployeeDashboard = ({ user, onLogout }) => {
       setPwMessage({ type: 'error', text: err.message || 'Failed to update password.' });
     } finally {
       setPwLoading(false);
+    }
+  };
+
+  const handlePinSubmit = (e) => {
+    e.preventDefault();
+    setPinMessage(null);
+    if (pinCurrent !== inventoryPin) {
+      setPinMessage({ type: 'error', text: 'Current PIN is incorrect.' });
+      return;
+    }
+    if (pinNew !== pinConfirm) {
+      setPinMessage({ type: 'error', text: 'New PINs do not match.' });
+      return;
+    }
+    if (pinNew.length !== 4 || !/^\d+$/.test(pinNew)) {
+      setPinMessage({ type: 'error', text: 'New PIN must be exactly 4 digits.' });
+      return;
+    }
+    handlePinChange();
+  };
+
+  const handlePinChange = () => {
+    setPinLoading(true);
+    try {
+      setInventoryPin(pinNew);
+      localStorage.setItem('edp_inventory_pin', pinNew);
+      setPinMessage({ type: 'success', text: 'Inventory PIN updated successfully!' });
+      setPinCurrent(''); setPinNew(''); setPinConfirm('');
+    } catch (err) {
+      setPinMessage({ type: 'error', text: 'Failed to update PIN.' });
+    } finally {
+      setPinLoading(false);
     }
   };
 
@@ -1514,21 +1564,38 @@ const EmployeeDashboard = ({ user, onLogout }) => {
         }
 
         .dropdown-container {
+          position: absolute;
+          left: 1rem;
+          right: 1rem;
+          z-index: 50;
           display: grid;
           grid-template-rows: 0fr;
           opacity: 0;
           transition: grid-template-rows 0.3s ease-out, opacity 0.3s ease-out, margin 0.3s ease-out;
           overflow: hidden;
+          background: inherit;
+          pointer-events: none;
         }
 
         .dropdown-container.open {
           grid-template-rows: 1fr;
           opacity: 1;
           margin-top: 0.5rem;
+          pointer-events: auto;
+          background: white;
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+          border-left: 2px solid #6366f1;
+        }
+
+        .dark .dropdown-container.open {
+          background: rgb(15, 23, 42); /* slate-900 */
+          border-left: 2px solid #818cf8; /* indigo-400 */
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
         }
 
         .dropdown-content {
           min-height: 0;
+          padding: 0.5rem;
         }
       `}</style>
 
@@ -1591,9 +1658,19 @@ const EmployeeDashboard = ({ user, onLogout }) => {
                 {sidebarOpen && <span className="font-semibold">Employees</span>}
               </button>
 
-              <div>
+              <div className="relative">
                 <button
-                  onClick={() => setInventoryDropdownOpen(!inventoryDropdownOpen)}
+                  onClick={() => {
+                    if (inventoryDropdownOpen) {
+                      setInventoryDropdownOpen(false);
+                    } else if (isInventoryAuthorized) {
+                      setInventoryDropdownOpen(true);
+                    } else {
+                      setShowInventoryPinModal(true);
+                      setInventoryPinInput('');
+                      setInventoryPinError(false);
+                    }
+                  }}
                   className={`sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${currentPage.startsWith('inventory')
                     ? 'active bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 text-indigo-600 dark:text-indigo-400'
                     : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
@@ -1609,7 +1686,7 @@ const EmployeeDashboard = ({ user, onLogout }) => {
                 </button>
 
                 {sidebarOpen && (
-                  <div className={`dropdown-container ${inventoryDropdownOpen ? 'open' : ''} ml-6 pl-4 border-l-2 border-slate-100 dark:border-slate-800`}>
+                  <div className={`dropdown-container ${inventoryDropdownOpen ? 'open' : ''}`}>
                     <div className="dropdown-content space-y-1">
                       <button
                         onClick={() => setCurrentPage('inventory_fixed_assets')}
@@ -1711,137 +1788,191 @@ const EmployeeDashboard = ({ user, onLogout }) => {
                 }
               />
             ) : currentPage === 'settings' ? (
-              <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in duration-500">
-                <div>
-                  <h1 className="text-4xl font-bold text-slate-800 dark:text-slate-100 mb-1">Settings</h1>
-                  <p className="text-slate-500 dark:text-slate-400">Manage your account and preferences.</p>
-
+              <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in duration-500">
+                <div className="flex items-end justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+                  <div>
+                    <h1 className="text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight">Settings</h1>
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Manage your account and credentials.</p>
+                  </div>
+                  <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/50 px-3 py-1.5 rounded-xl border border-slate-100 dark:border-slate-700">
+                    <Sun className={`w-3.5 h-3.5 ${isDarkMode ? 'text-slate-400' : 'text-amber-500 animate-pulse'}`} />
+                    <div className="relative inline-block w-8 h-4 align-middle select-none transition duration-200 ease-in">
+                      <input
+                        type="checkbox"
+                        checked={isDarkMode}
+                        onChange={() => setIsDarkMode(!isDarkMode)}
+                        className="toggle-checkbox absolute block w-4 h-4 rounded-full bg-white border-2 appearance-none cursor-pointer border-slate-200 dark:border-indigo-600 transition-transform duration-300 ease-in-out"
+                        style={{
+                          transform: isDarkMode ? 'translateX(100%)' : 'translateX(0)',
+                        }}
+                      />
+                      <label className={`block overflow-hidden h-4 rounded-full bg-slate-200 cursor-pointer transition-colors duration-300 ${isDarkMode ? 'bg-indigo-600' : 'bg-slate-200'}`}></label>
+                    </div>
+                    <Moon className={`w-3.5 h-3.5 ${isDarkMode ? 'text-indigo-400 animate-pulse' : 'text-slate-400'}`} />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                   {/* Section 1: Change Password */}
                   <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
-                    <div className="px-8 py-5 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
-                      <div className="w-9 h-9 bg-indigo-50 dark:bg-indigo-500/10 rounded-xl flex items-center justify-center">
+                    <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
+                      <div className="w-8 h-8 bg-indigo-50 dark:bg-indigo-500/10 rounded-lg flex items-center justify-center">
                         <Settings className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                       </div>
-                      <div>
-                        <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">Change Password</h2>
-                        <p className="text-xs text-slate-400">Update your login credentials</p>
-                      </div>
+                      <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">Change Password</h2>
                     </div>
-                    <form onSubmit={handlePasswordSubmit} className="px-8 py-6 space-y-5">
+                    <form onSubmit={handlePasswordSubmit} className="px-6 py-4 space-y-4">
                       {pwMessage && (
-                        <div className={`px-4 py-3 rounded-xl text-sm font-medium ${pwMessage.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-500/20' : 'bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-100 dark:border-rose-500/20'}`}>
+                        <div className={`px-3 py-2 rounded-lg text-xs font-medium ${pwMessage.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : 'bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400'}`}>
                           {pwMessage.text}
                         </div>
                       )}
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Current Password</label>
-                        <div className="relative">
-                          <input
-                            type={showPwCurrent ? 'text' : 'password'}
-                            required
-                            value={pwCurrent}
-                            onChange={e => { setPwCurrent(e.target.value); setPwMessage(null); }}
-                            className="w-full px-4 py-2.5 pr-10 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-xl text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all"
-                            placeholder="Enter current password"
-                          />
-                          <button type="button" onClick={() => setShowPwCurrent(p => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                            {showPwCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          </button>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Current Password</label>
+                          <div className="relative">
+                            <input
+                              type={showPwCurrent ? 'text' : 'password'}
+                              required
+                              value={pwCurrent}
+                              onChange={e => { setPwCurrent(e.target.value); setPwMessage(null); }}
+                              className="w-full px-3 py-2 pr-9 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20"
+                              placeholder="Current"
+                            />
+                            <button type="button" onClick={() => setShowPwCurrent(p => !p)} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400">
+                              {showPwCurrent ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">New Password</label>
+                            <div className="relative">
+                              <input
+                                type={showPwNew ? 'text' : 'password'}
+                                required
+                                value={pwNew}
+                                onChange={e => { setPwNew(e.target.value); setPwMessage(null); }}
+                                className="w-full px-3 py-2 pr-9 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                placeholder="New"
+                              />
+                              <button type="button" onClick={() => setShowPwNew(p => !p)} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400">
+                                {showPwNew ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Confirm</label>
+                            <div className="relative">
+                              <input
+                                type={showPwConfirm ? 'text' : 'password'}
+                                required
+                                value={pwConfirm}
+                                onChange={e => { setPwConfirm(e.target.value); setPwMessage(null); }}
+                                className="w-full px-3 py-2 pr-9 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                placeholder="Confirm"
+                              />
+                              <button type="button" onClick={() => setShowPwConfirm(p => !p)} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400">
+                                {showPwConfirm ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">New Password</label>
-                        <div className="relative">
-                          <input
-                            type={showPwNew ? 'text' : 'password'}
-                            required
-                            value={pwNew}
-                            onChange={e => { setPwNew(e.target.value); setPwMessage(null); }}
-                            className="w-full px-4 py-2.5 pr-10 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-xl text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all"
-                            placeholder="Enter new password"
-                          />
-                          <button type="button" onClick={() => setShowPwNew(p => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                            {showPwNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          </button>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Confirm New Password</label>
-                        <div className="relative">
-                          <input
-                            type={showPwConfirm ? 'text' : 'password'}
-                            required
-                            value={pwConfirm}
-                            onChange={e => { setPwConfirm(e.target.value); setPwMessage(null); }}
-                            className="w-full px-4 py-2.5 pr-10 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-xl text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all"
-                            placeholder="Confirm new password"
-                          />
-                          <button type="button" onClick={() => setShowPwConfirm(p => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                            {showPwConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          </button>
-                        </div>
-                      </div>
-                      <div className="pt-2">
-                        <button
-                          type="submit"
-                          disabled={pwLoading}
-                          className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-indigo-100 dark:shadow-indigo-900/20"
-                        >
-                          {pwLoading ? (
-                            <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Updating...</>
-                          ) : 'Update Password'}
-                        </button>
-                      </div>
+                      <button
+                        type="submit"
+                        disabled={pwLoading}
+                        className="w-full py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-all disabled:opacity-50"
+                      >
+                        {pwLoading ? 'Updating...' : 'Update Password'}
+                      </button>
                     </form>
                   </div>
 
-                  {/* Section 2: Theme Preferences */}
+                  {/* Section 2: Change Inventory PIN */}
                   <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
-                    <div className="px-8 py-5 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
-                      <div className="w-9 h-9 bg-purple-50 dark:bg-purple-500/10 rounded-xl flex items-center justify-center">
-                        <Moon className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                    <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
+                      <div className="w-8 h-8 bg-purple-50 dark:bg-purple-500/10 rounded-lg flex items-center justify-center">
+                        <ClipboardList className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                       </div>
-                      <div>
-                        <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">Theme Preferences</h2>
-                        <p className="text-xs text-slate-400">Choose your preferred appearance</p>
-                      </div>
+                      <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">Change PIN</h2>
                     </div>
-                    <div className="px-8 py-6 space-y-5">
-                      <div className="flex items-center justify-between p-4 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer" onClick={() => setIsDarkMode(!isDarkMode)}>
-                        <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
-                            {isDarkMode ? <Moon className="w-5 h-5 text-white" /> : <Sun className="w-5 h-5 text-slate-700" />}
+                    <form onSubmit={handlePinSubmit} className="px-6 py-4 space-y-4">
+                      {pinMessage && (
+                        <div className={`px-3 py-2 rounded-lg text-xs font-medium ${pinMessage.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : 'bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400'}`}>
+                          {pinMessage.text}
+                        </div>
+                      )}
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Current PIN</label>
+                          <div className="relative">
+                            <input
+                              type={showPinCurrent ? 'text' : 'password'}
+                              inputMode="numeric"
+                              pattern="\d*"
+                              maxLength={4}
+                              required
+                              value={pinCurrent}
+                              onChange={e => { setPinCurrent(e.target.value.replace(/\D/g, '')); setPinMessage(null); }}
+                              className="w-full px-3 py-2 pr-9 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20"
+                              placeholder="Current"
+                            />
+                            <button type="button" onClick={() => setShowPinCurrent(p => !p)} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400">
+                              {showPinCurrent ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">New PIN</label>
+                            <div className="relative">
+                              <input
+                                type={showPinNew ? 'text' : 'password'}
+                                inputMode="numeric"
+                                pattern="\d*"
+                                maxLength={4}
+                                required
+                                value={pinNew}
+                                onChange={e => { setPinNew(e.target.value.replace(/\D/g, '')); setPinMessage(null); }}
+                                className="w-full px-3 py-2 pr-9 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                placeholder="New"
+                              />
+                              <button type="button" onClick={() => setShowPinNew(p => !p)} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400">
+                                {showPinNew ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
                           </div>
                           <div>
-                            <p className="font-bold text-slate-800 dark:text-slate-200 text-sm">Dark Mode</p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">Reduce eye strain in low light</p>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Confirm</label>
+                            <div className="relative">
+                              <input
+                                type={showPinConfirm ? 'text' : 'password'}
+                                inputMode="numeric"
+                                pattern="\d*"
+                                maxLength={4}
+                                required
+                                value={pinConfirm}
+                                onChange={e => { setPinConfirm(e.target.value.replace(/\D/g, '')); setPinMessage(null); }}
+                                className="w-full px-3 py-2 pr-9 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                placeholder="Confirm"
+                              />
+                              <button type="button" onClick={() => setShowPinConfirm(p => !p)} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400">
+                                {showPinConfirm ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
                           </div>
                         </div>
-
-                        <div className="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
-                          <input
-                            type="checkbox"
-                            name="toggle"
-                            id="toggle-dark-mode"
-                            checked={isDarkMode}
-                            onChange={() => setIsDarkMode(!isDarkMode)}
-                            className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer border-slate-200 dark:border-indigo-600 transition-transform duration-300 ease-in-out"
-                            style={{
-                              transform: isDarkMode ? 'translateX(100%)' : 'translateX(0)',
-                            }}
-                          />
-                          <label
-                            htmlFor="toggle-dark-mode"
-                            className={`toggle-label block overflow-hidden h-6 rounded-full bg-slate-200 cursor-pointer transition-colors duration-300 ${isDarkMode ? 'bg-indigo-600' : 'bg-slate-200'}`}
-                          ></label>
-                        </div>
                       </div>
-                    </div>
+                      <button
+                        type="submit"
+                        disabled={pinLoading}
+                        className="w-full py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-all disabled:opacity-50"
+                      >
+                        {pinLoading ? 'Updating...' : 'Update PIN'}
+                      </button>
+                    </form>
                   </div>
-
                 </div>
               </div>
             ) : (
@@ -4205,38 +4336,40 @@ const EmployeeDashboard = ({ user, onLogout }) => {
         }
 
         {/* Password Confirmation Modal */}
-        {showPwConfirmModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity" onClick={() => setShowPwConfirmModal(false)} />
-            <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-6 animate-in zoom-in-95 duration-200 border-2 border-slate-100 dark:border-slate-800">
-              <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto border-4 border-indigo-100">
-                <UserCheck className="w-6 h-6 text-indigo-600" />
-              </div>
+        {
+          showPwConfirmModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity" onClick={() => setShowPwConfirmModal(false)} />
+              <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-6 animate-in zoom-in-95 duration-200 border-2 border-slate-100 dark:border-slate-800">
+                <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto border-4 border-indigo-100">
+                  <UserCheck className="w-6 h-6 text-indigo-600" />
+                </div>
 
-              <div className="text-center space-y-2">
-                <h3 className="text-xl font-black text-slate-800 dark:text-white">Update Password?</h3>
-                <p className="text-sm font-medium text-slate-500">
-                  Are you sure you want to change your password? You will need to use the new password next time you log in.
-                </p>
-              </div>
+                <div className="text-center space-y-2">
+                  <h3 className="text-xl font-black text-slate-800 dark:text-white">Update Password?</h3>
+                  <p className="text-sm font-medium text-slate-500">
+                    Are you sure you want to change your password? You will need to use the new password next time you log in.
+                  </p>
+                </div>
 
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => setShowPwConfirmModal(false)}
-                  className="flex-1 px-4 py-2.5 bg-white border-2 border-slate-100 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:border-slate-200 transition-all uppercase tracking-wide"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handlePasswordChange}
-                  className="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all uppercase tracking-wide"
-                >
-                  Confirm
-                </button>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => setShowPwConfirmModal(false)}
+                    className="flex-1 px-4 py-2.5 bg-white border-2 border-slate-100 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:border-slate-200 transition-all uppercase tracking-wide"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handlePasswordChange}
+                    className="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all uppercase tracking-wide"
+                  >
+                    Confirm
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )
+        }
 
         {/* Delete Confirmation Modal */}
         {
@@ -4276,6 +4409,89 @@ const EmployeeDashboard = ({ user, onLogout }) => {
             </div>
           )
         }
+        {/* Inventory PIN Protection Modal */}
+        {
+          showInventoryPinModal && (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] animate-in fade-in zoom-in duration-200">
+              <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-sm w-full p-8 border border-white/20 relative overflow-hidden">
+                {/* Background Glow */}
+                <div className="absolute -top-24 -right-24 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl" />
+                <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl" />
+
+                <div className="relative flex flex-col items-center text-center space-y-6">
+                  <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-200 dark:shadow-none animate-bounce-subtle">
+                    <ClipboardList className="w-8 h-8" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Protected Access</h3>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">
+                      Please enter your 4-digit PIN to<br />unlock the Inventory Management system.
+                    </p>
+                  </div>
+
+                  {/* PIN Display Underlines */}
+                  <div className="flex gap-4 py-8 relative">
+                    {/* Hidden Input for capturing PIN */}
+                    <input
+                      type="password"
+                      pattern="\d*"
+                      maxLength={4}
+                      value={inventoryPinInput}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        setInventoryPinInput(val);
+                        setInventoryPinError(false);
+                        if (val.length === 4) {
+                          if (val === inventoryPin) {
+                            setIsInventoryAuthorized(true);
+                            setInventoryDropdownOpen(true);
+                            setShowInventoryPinModal(false);
+                          } else {
+                            setInventoryPinError(true);
+                            setTimeout(() => setInventoryPinInput(''), 500);
+                          }
+                        }
+                      }}
+                      autoFocus
+                      className="absolute inset-0 opacity-0 cursor-default"
+                    />
+                    {[...Array(4)].map((_, i) => (
+                      <div key={i} className="flex flex-col items-center gap-2">
+                        <span className={`text-2xl font-black transition-all duration-300 transform ${inventoryPinInput.length > i
+                          ? 'opacity-100 translate-y-0 scale-110 text-slate-800 dark:text-white'
+                          : 'opacity-0 translate-y-4 scale-50'
+                          }`}>
+                          *
+                        </span>
+                        <div
+                          className={`w-10 h-1 transition-all duration-300 ${inventoryPinInput.length > i
+                            ? 'bg-indigo-600 shadow-[0_0_10px_rgba(79,70,229,0.5)]'
+                            : 'bg-slate-200 dark:bg-slate-700'
+                            } ${inventoryPinError ? 'bg-red-500 animate-shake' : ''}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  {inventoryPinError && (
+                    <p className="text-red-500 text-xs font-bold uppercase tracking-wider animate-shake">
+                      Incorrect PIN. Please try again.
+                    </p>
+                  )}
+
+                  <button
+                    onClick={() => setShowInventoryPinModal(false)}
+                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-xs font-bold uppercase tracking-widest pt-2 transition-colors"
+                  >
+                    Cancel Access
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
+        }
+
         {/* Sign Out Confirmation Modal */}
         {
           showSignOutModal && (
