@@ -599,7 +599,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                         <div>
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-200">
-                                    <ClipboardList className="w-6 h-6 text-white" />
+                                    <img src="/icon/inventory-management.png" alt="Inventory" className="w-6 h-6 object-contain brightness-0 invert" />
                                 </div>
                                 <h1 className="text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight">{title}</h1>
                             </div>
@@ -1389,7 +1389,7 @@ const Inventory = ({ title = "Enterprise Unit Control", tableName = "inventory" 
                                 <div className="p-3.5 px-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <div className="p-1.5 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 rounded-lg shadow-sm">
-                                            <ClipboardList className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                                            <img src="/icon/inventory-management.png" alt="Inventory" className="w-4 h-4 object-contain" style={{ filter: 'invert(37%) sepia(98%) saturate(749%) hue-rotate(213deg) brightness(97%) contrast(96%)' }} />
                                         </div>
                                         <div className="max-w-[200px]">
                                             <h2 className="text-xl font-black text-black dark:text-white tracking-tight leading-none uppercase">Check Out Info</h2>

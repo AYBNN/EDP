@@ -1707,7 +1707,7 @@ const EmployeeDashboard = ({ user, onLogout }) => {
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
                   }`}
               >
-                <Building2 className={`w-5 h-5 ${sidebarOpen ? '' : 'mx-auto'}`} />
+                <img src="/icon/dashboard.png" alt="Dashboard" className={`w-5 h-5 ${sidebarOpen ? '' : 'mx-auto'} object-contain ${currentPage === 'dashboard' ? 'brightness-100' : 'opacity-60'} dark:invert`} />
                 {sidebarOpen && <span className="font-semibold">Dashboard</span>}
               </button>
 
@@ -1718,7 +1718,7 @@ const EmployeeDashboard = ({ user, onLogout }) => {
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
                   }`}
               >
-                <Users className={`w-5 h-5 ${sidebarOpen ? '' : 'mx-auto'}`} />
+                <img src="/icon/man.png" alt="Employees" className={`w-5 h-5 ${sidebarOpen ? '' : 'mx-auto'} object-contain ${currentPage === 'employees' ? 'brightness-100' : 'opacity-60'} dark:invert`} />
                 {sidebarOpen && <span className="font-semibold">Employees</span>}
               </button>
 
@@ -1740,7 +1740,7 @@ const EmployeeDashboard = ({ user, onLogout }) => {
                     : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
                     }`}
                 >
-                  <ClipboardList className={`w-5 h-5 ${sidebarOpen ? '' : 'mx-auto'}`} />
+                  <img src="/icon/inventory-management.png" alt="Inventory" className={`w-5 h-5 ${sidebarOpen ? '' : 'mx-auto'} object-contain ${currentPage.startsWith('inventory') ? 'brightness-100' : 'opacity-60'} dark:invert`} />
                   {sidebarOpen && (
                     <div className="flex items-center justify-between flex-1">
                       <span className="font-semibold">Inventory</span>
@@ -1811,14 +1811,14 @@ const EmployeeDashboard = ({ user, onLogout }) => {
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
                   }`}
               >
-                <Settings className={`w-5 h-5 ${sidebarOpen ? '' : 'mx-auto'}`} />
+                <img src="/icon/setting.png" alt="Settings" className={`w-5 h-5 ${sidebarOpen ? '' : 'mx-auto'} object-contain ${currentPage === 'settings' ? 'brightness-100' : 'opacity-60'} dark:invert`} />
                 {sidebarOpen && <span className="font-semibold">Settings</span>}
               </button>
               <button
                 onClick={() => setShowSignOutModal(true)}
                 className="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
               >
-                <LogOut className={`w-5 h-5 ${sidebarOpen ? '' : 'mx-auto'}`} />
+                <img src="/icon/logout.png" alt="Log out" className={`w-5 h-5 ${sidebarOpen ? '' : 'mx-auto'} object-contain`} style={{ filter: 'brightness(0) saturate(100%) invert(20%) sepia(90%) saturate(5000%) hue-rotate(350deg) brightness(100%) contrast(110%)' }} />
                 {sidebarOpen && <span className="font-semibold">Log out</span>}
               </button>
             </div>
@@ -2060,7 +2060,7 @@ const EmployeeDashboard = ({ user, onLogout }) => {
                             </p>
                           </div>
                           <div className="icon-wrapper w-14 h-14 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-2xl flex items-center justify-center shadow-lg">
-                            <Users className="w-7 h-7 text-white" />
+                            <img src="/icon/man.png" alt="Employees" className="w-7 h-7 object-contain brightness-0 invert" />
                           </div>
                         </div>
                       </div>
@@ -2074,7 +2074,7 @@ const EmployeeDashboard = ({ user, onLogout }) => {
                             </p>
                           </div>
                           <div className="icon-wrapper w-14 h-14 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl flex items-center justify-center shadow-lg">
-                            <UserCheck className="w-7 h-7 text-white" />
+                            <img src="/icon/employee.png" alt="Active" className="w-7 h-7 object-contain brightness-0 invert" />
                           </div>
                         </div>
                       </div>
@@ -2088,7 +2088,7 @@ const EmployeeDashboard = ({ user, onLogout }) => {
                             </p>
                           </div>
                           <div className="icon-wrapper w-14 h-14 bg-gradient-to-br from-orange-400 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg">
-                            <Building2 className="w-7 h-7 text-white" />
+                            <img src="/icon/corporation.png" alt="Departments" className="w-7 h-7 object-contain brightness-0 invert" />
                           </div>
                         </div>
                       </div>
@@ -2184,7 +2184,7 @@ const EmployeeDashboard = ({ user, onLogout }) => {
                             onClick={handleOpenAddModal}
                             className="btn-primary flex items-center justify-center gap-2 px-6 py-3 text-white rounded-xl font-semibold shadow-lg whitespace-nowrap"
                           >
-                            <Plus className="w-5 h-5" />
+                            <img src="/icon/incorporation.png" alt="Add Employee" className="w-5 h-5 object-contain brightness-0 invert" />
                             Add Employee
                           </button>
                         </div>
@@ -4484,7 +4484,7 @@ const EmployeeDashboard = ({ user, onLogout }) => {
 
                 <div className="relative flex flex-col items-center text-center space-y-6">
                   <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-200 dark:shadow-none animate-bounce-subtle">
-                    <ClipboardList className="w-8 h-8" />
+                    <img src="/icon/inventory-management.png" alt="Inventory" className="w-8 h-8 object-contain brightness-0 invert" />
                   </div>
 
                   <div className="space-y-2">
