@@ -98,20 +98,22 @@ const PrintableProfileView = ({ employee, onClose }) => {
             </style>
 
             {/* Controls - Hidden when printing */}
-            <div className="no-print fixed top-4 right-4 flex gap-2 z-50 print:hidden">
-                <button
-                    onClick={handlePrint}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-lg"
-                >
-                    <Printer size={18} />
-                    Print Form
-                </button>
-                <button
-                    onClick={onClose}
-                    className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
-                >
-                    Close
-                </button>
+            <div className="no-print sticky top-0 w-full h-0 z-[80] print:hidden pointer-events-none">
+                <div className="flex justify-end gap-2 p-4 pointer-events-auto">
+                    <button
+                        onClick={handlePrint}
+                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-lg"
+                    >
+                        <Printer size={18} />
+                        Print Form
+                    </button>
+                    <button
+                        onClick={onClose}
+                        className="px-4 py-2 bg-white dark:bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors shadow-lg border border-slate-200"
+                    >
+                        Close
+                    </button>
+                </div>
             </div>
 
             {/* ---------------- PAGE 1 ---------------- */}
