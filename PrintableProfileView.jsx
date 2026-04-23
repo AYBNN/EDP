@@ -212,7 +212,7 @@ const PrintableProfileView = ({ employee, onClose }) => {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 mb-2">
+                    <div className="grid grid-cols-3 gap-4 mb-2">
                         <div className="flex items-end">
                             <span className="font-bold w-16">Birthday:</span>
                             <div className="border-b border-black flex-1 px-2">{formatDate(employee.birthday)}</div>
@@ -221,18 +221,26 @@ const PrintableProfileView = ({ employee, onClose }) => {
                             <span className="font-bold w-10">Age:</span>
                             <div className="border-b border-black flex-1 px-2">{employee.age || calculateAge(employee.birthday)}</div>
                         </div>
+                        <div className="flex items-end">
+                            <span className="font-bold w-10">Sex:</span>
+                            <div className="border-b border-black flex-1 px-2">{employee.sex}</div>
+                        </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 mb-2">
-                        <div className="flex items-start">
+                    <div className="grid grid-cols-3 gap-4 mb-2">
+                        <div className="flex items-start col-span-1">
                             <span className="font-bold w-16 mt-1">Address:</span>
                             <div className="border-b border-black flex-1 px-2 h-auto min-h-[1.5em] break-words">
                                 {`${employee.street || ''} ${employee.barangay || ''} ${employee.city || ''} ${employee.province || ''}`}
                             </div>
                         </div>
                         <div className="flex items-end">
-                            <span className="font-bold w-10">Status:</span>
+                            <span className="font-bold w-20">Work Status:</span>
                             <div className="border-b border-black flex-1 px-2">{employee.status}</div>
+                        </div>
+                        <div className="flex items-end">
+                            <span className="font-bold w-20">Civil Status:</span>
+                            <div className="border-b border-black flex-1 px-2">{employee.civilStatus}</div>
                         </div>
                     </div>
 

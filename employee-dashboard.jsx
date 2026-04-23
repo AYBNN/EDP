@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Building2, UserCheck, Search, Plus, Pencil, Trash2, X, Menu, ChevronLeft, ChevronRight, Eye, EyeOff, Maximize2, Minimize2, Camera, User, Upload, LogOut, ClipboardList, Settings, ChevronDown, Sun, Moon } from 'lucide-react';
+import { Users, Building2, UserCheck, Search, Plus, Pencil, Trash2, X, Menu, ChevronLeft, ChevronRight, Eye, EyeOff, Maximize2, Minimize2, Camera, User, Upload, LogOut, ClipboardList, Settings, ChevronDown, Sun, Moon, Archive } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import PrintableProfileView from './PrintableProfileView';
 import Inventory from './Inventory';
@@ -169,6 +169,7 @@ const INITIAL_FORM_DATA = {
   age: '',
   sex: '',
   status: 'Active',
+  civilStatus: 'Single',
   position: '',
   department: '',
   region: '',
@@ -321,6 +322,7 @@ const EmployeeDashboard = ({ user, onLogout }) => {
 
   const [selectedPosition, setSelectedPosition] = useState('');
   const [showAllColumns, setShowAllColumns] = useState(false);
+  const [employeeStatusFilter, setEmployeeStatusFilter] = useState('Active');
 
   // Delete Confirmation States
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -466,6 +468,7 @@ const EmployeeDashboard = ({ user, onLogout }) => {
 
   const totalEmployees = employees.length;
   const activeEmployees = employees.filter(emp => emp.status === 'Active').length;
+  const retiredEmployeesCount = employees.filter(emp => emp.status === 'Retired').length;
   const departments = [...new Set(employees.map(emp => emp.hired_dept || emp.department))].length;
   const uniquePositions = [...new Set(employees.map(emp => emp.hired_position || emp.position))].filter(Boolean).sort((a, b) => a.localeCompare(b));
 
@@ -474,7 +477,8 @@ const EmployeeDashboard = ({ user, onLogout }) => {
       (emp.employee_id || '').toLowerCase().includes(searchQuery.toLowerCase());
     const empPosition = emp.hired_position || emp.position;
     const matchesPosition = selectedPosition ? empPosition === selectedPosition : true;
-    return matchesSearch && matchesPosition;
+    const matchesStatus = emp.status === employeeStatusFilter;
+    return matchesSearch && matchesPosition && matchesStatus;
   });
 
   const indexOfLastItem = currentTablePage * itemsPerPage;
@@ -728,6 +732,7 @@ const EmployeeDashboard = ({ user, onLogout }) => {
             age: emp.age || '',
             sex: emp.sex || '',
             status: emp.status || 'Active',
+            civilStatus: emp.civil_status || 'Single',
             hiredPosition: emp.hired_position || '',
             positionApplied: emp.position_applied || '',
             reportingDate: emp.reporting_date || '',
@@ -893,6 +898,7 @@ const EmployeeDashboard = ({ user, onLogout }) => {
         age: formData.age ? parseInt(formData.age) : null,
         sex: formData.sex || '',
         status: formData.status || 'Active',
+        civil_status: formData.civilStatus || 'Single',
         position: formData.position || '',
         department: formData.department || '',
         region: formData.region || '',
@@ -1020,10 +1026,21 @@ const EmployeeDashboard = ({ user, onLogout }) => {
 
         if (isEditing && editEmployeeId) {
           // Update existing employee
-          const { error } = await supabase
+          let { error } = await supabase
             .from('employees')
             .update(employeeData)
             .eq('id', editEmployeeId);
+
+          // Fallback if civil_status column is missing
+          if (error && error.message && (error.message.includes('civil_status') || error.code === 'PGRST204')) {
+            console.warn('civil_status column missing, retrying without it');
+            const { civil_status, ...restData } = employeeData;
+            const retry = await supabase
+              .from('employees')
+              .update(restData)
+              .eq('id', editEmployeeId);
+            error = retry.error;
+          }
 
           if (error) throw error;
           employeeId = editEmployeeId;
@@ -1043,14 +1060,27 @@ const EmployeeDashboard = ({ user, onLogout }) => {
           await supabase.from('professional_references').delete().eq('employee_id', employeeId);
         } else {
           // Insert new employee
-          const { data, error } = await supabase
+          let { data: newEmp, error } = await supabase
             .from('employees')
-            .insert([employeeData])
+            .insert(employeeData)
             .select()
             .single();
 
+          // Fallback if civil_status column is missing
+          if (error && error.message && (error.message.includes('civil_status') || error.code === 'PGRST204')) {
+            console.warn('civil_status column missing, retrying without it');
+            const { civil_status, ...restData } = employeeData;
+            const retry = await supabase
+              .from('employees')
+              .insert(restData)
+              .select()
+              .single();
+            newEmp = retry.data;
+            error = retry.error;
+          }
+
           if (error) throw error;
-          employeeId = data.id;
+          employeeId = newEmp.id;
 
           // Log new employee
           await logActivity('new', 'New employee added', `${formData.lastName}, ${formData.firstName} joined ${formData.hiredDept || formData.department || 'the team'}`);
@@ -2160,6 +2190,48 @@ const EmployeeDashboard = ({ user, onLogout }) => {
                         </h1>
                         <p className="text-slate-500 dark:text-slate-400 text-lg">Manage your team members</p>
                       </div>
+
+                      <div className="flex items-center gap-4">
+                        <button
+                          onClick={() => {
+                            setEmployeeStatusFilter('Active');
+                            setCurrentTablePage(1);
+                          }}
+                          className={`flex items-center gap-3 px-6 py-3 rounded-full transition-all duration-300 ${employeeStatusFilter === 'Active'
+                            ? 'bg-[#008080] text-white shadow-lg shadow-teal-200 dark:shadow-none scale-105'
+                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-2 border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm'
+                            }`}
+                        >
+                          <ClipboardList className={`w-4 h-4 ${employeeStatusFilter === 'Active' ? 'text-white' : 'text-slate-400'}`} />
+                          <span className="font-bold text-sm tracking-tight">Active Employees</span>
+                          <span className={`flex items-center justify-center min-w-[24px] h-6 px-1.5 rounded-full text-[11px] font-black ${employeeStatusFilter === 'Active'
+                            ? 'bg-white/20 text-white'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                            }`}>
+                            {activeEmployees}
+                          </span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setEmployeeStatusFilter('Retired');
+                            setCurrentTablePage(1);
+                          }}
+                          className={`flex items-center gap-3 px-6 py-3 rounded-full transition-all duration-300 ${employeeStatusFilter === 'Retired'
+                            ? 'bg-[#008080] text-white shadow-lg shadow-teal-200 dark:shadow-none scale-105'
+                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-2 border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm'
+                            }`}
+                        >
+                          <Archive className={`w-4 h-4 ${employeeStatusFilter === 'Retired' ? 'text-white' : 'text-slate-400'}`} />
+                          <span className="font-bold text-sm tracking-tight">Retired Employees</span>
+                          <span className={`flex items-center justify-center min-w-[24px] h-6 px-1.5 rounded-full text-[11px] font-black ${employeeStatusFilter === 'Retired'
+                            ? 'bg-white/20 text-white'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                            }`}>
+                            {retiredEmployeesCount}
+                          </span>
+                        </button>
+                      </div>
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 w-full">
                         <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto flex-1">
                           <div className="relative w-full md:w-56">
@@ -2257,7 +2329,7 @@ const EmployeeDashboard = ({ user, onLogout }) => {
                                   <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">PhilHealth No.</th>
                                   <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Tin No.</th>
                                   <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Department</th>
-                                  <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Status</th>
+                                  <th className="px-3 py-4 text-left text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Work Status</th>
                                 </>
                               )}
 
@@ -2614,23 +2686,39 @@ const EmployeeDashboard = ({ user, onLogout }) => {
                               </div>
                             </div>
 
-                            {/* Employee ID Section */}
-                            <div className="flex items-center gap-3">
-                              <label className="text-[13px] font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">Employee ID:</label>
-                              <div className="flex items-center border-b-2 border-slate-300 dark:border-slate-600 focus-within:border-indigo-600 transition-colors h-8">
-                                <span className="text-[13px] font-medium text-slate-800 dark:text-slate-200 pl-1 leading-none">EDP NO.</span>
-                                <input
-                                  type="text"
-                                  value={formData.employeeIdNumber}
-                                  onChange={(e) => {
-                                    const value = e.target.value.replace(/\D/g, '').slice(0, 4);
-                                    setFormData({ ...formData, employeeIdNumber: value });
-                                  }}
-                                  className="w-14 pl-1 focus:outline-none bg-transparent text-[13px] font-medium text-slate-800 dark:text-white leading-none h-full"
+                            <div className="flex items-center gap-6">
+                              {/* Work Status Section */}
+                              <div className="flex items-center gap-3">
+                                <label className="text-[13px] font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">Work Status:</label>
+                                <select
+                                  value={formData.status}
+                                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                  className="h-8 border-b-2 border-slate-300 dark:border-slate-600 focus:border-indigo-600 focus:outline-none bg-transparent text-[13px] font-medium text-slate-800 dark:text-white"
                                   disabled={isViewOnly}
-                                  placeholder="0000"
-                                  maxLength="4"
-                                />
+                                >
+                                  <option value="Active">Active</option>
+                                  <option value="Retired">Retired</option>
+                                </select>
+                              </div>
+
+                              {/* Employee ID Section */}
+                              <div className="flex items-center gap-3">
+                                <label className="text-[13px] font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">Employee ID:</label>
+                                <div className="flex items-center border-b-2 border-slate-300 dark:border-slate-600 focus-within:border-indigo-600 transition-colors h-8">
+                                  <span className="text-[13px] font-medium text-slate-800 dark:text-slate-200 pl-1 leading-none">EDP NO.</span>
+                                  <input
+                                    type="text"
+                                    value={formData.employeeIdNumber}
+                                    onChange={(e) => {
+                                      const value = e.target.value.replace(/\D/g, '').slice(0, 4);
+                                      setFormData({ ...formData, employeeIdNumber: value });
+                                    }}
+                                    className="w-14 pl-1 focus:outline-none bg-transparent text-[13px] font-medium text-slate-800 dark:text-white leading-none h-full"
+                                    disabled={isViewOnly}
+                                    placeholder="0000"
+                                    maxLength="4"
+                                  />
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -2751,15 +2839,15 @@ const EmployeeDashboard = ({ user, onLogout }) => {
                             />
                           </div>
                           <div>
-                            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Status</label>
+                            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Civil Status</label>
                             <select
-                              value={formData.status}
-                              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                              value={formData.civilStatus}
+                              onChange={(e) => setFormData({ ...formData, civilStatus: e.target.value })}
                               className="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-xl focus:border-indigo-400 focus:outline-none text-slate-800 dark:text-white"
                               disabled={isViewOnly}
                             >
-                              <option value="Active">Active</option>
-                              <option value="Inactive">Inactive</option>
+                              <option value="Single">Single</option>
+                              <option value="Married">Married</option>
                             </select>
                           </div>
                           <div>
