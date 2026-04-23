@@ -313,7 +313,7 @@ const Login = ({ onLogin }) => {
 
                             {/* Password */}
                             <div className="login-field-group">
-                                <label className="login-label">Password</label>
+                                <label className="login-label">Password1</label>
                                 <div className="login-input-wrap">
                                     <span className="login-input-icon">
                                         <Lock size={16} />
