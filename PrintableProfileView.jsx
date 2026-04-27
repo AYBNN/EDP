@@ -407,13 +407,6 @@ const PrintableProfileView = ({ employee, onClose }) => {
             {/* ---------------- PAGE 2 ---------------- */}
             <div className="print-page bg-white w-[210mm] min-h-[290mm] shadow-2xl mx-auto mb-8 flex flex-col relative text-black p-12 text-xs font-sans">
 
-                <div className="mb-4 text-[10px]">
-                    <div className="pt-1">
-                        <span className="font-bold">Summarize other employment related to this job:</span>
-                        <div className="border-b border-black w-full h-8 mt-1"></div>
-                    </div>
-                </div>
-
                 {/* EDUCATION Section Header */}
                 <div className="bg-gray-800 text-white font-bold text-center py-1 mb-2 text-xs uppercase">
                     EDUCATION
@@ -456,16 +449,60 @@ const PrintableProfileView = ({ employee, onClose }) => {
                 <div className="bg-gray-800 text-white font-bold text-center py-1 mb-2 text-xs uppercase">
                     CERTIFICATES/VOCATIONAL COURSE
                 </div>
-                <div className="mb-2 text-[11px] flex items-center justify-between">
-                    <div className="flex items-center">
-                        <span className="mr-4 font-bold">Do you have NCII?</span>
-                        <label className="inline-flex items-center mr-4"><CheckedBox checked={employee.hasNCII === "Yes"} /> Yes</label>
-                        <label className="inline-flex items-center"><CheckedBox checked={employee.hasNCII === "No" || !employee.hasNCII} /> No</label>
+                <div className="mb-2 text-[11px] flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                            <span className="mr-4 font-bold">Do you have NCII?</span>
+                            <label className="inline-flex items-center mr-4"><CheckedBox checked={employee.hasNCII === "Yes"} /> Yes</label>
+                            <label className="inline-flex items-center"><CheckedBox checked={employee.hasNCII === "No" || !employee.hasNCII} /> No</label>
+                        </div>
+                        <div className="flex items-end flex-1 ml-4">
+                            <span className="font-bold mr-2">Duty/specialized training:</span>
+                            <div className="border-b border-black flex-1 px-2">{employee.specializedTraining || ''}</div>
+                        </div>
                     </div>
-                    <div className="flex items-end flex-1 ml-4">
-                        <span className="font-bold mr-2">Duty/specialized training:</span>
-                        <div className="border-b border-black flex-1 px-2">{employee.specializedTraining || ''}</div>
-                    </div>
+                    {employee.hasNCII === "Yes" && (
+                        <div className="flex items-center gap-8 ml-0">
+                            <div className="flex items-end flex-1">
+                                <span className="font-bold mr-2">Renewed Date:</span>
+                                <div className="border-b border-black flex-1 px-2">{formatDate(employee.nciiRenewedDate)}</div>
+                            </div>
+                            <div className="flex items-end flex-1">
+                                <span className="font-bold mr-2">Expiry Date:</span>
+                                <div className="border-b border-black flex-1 px-2">{formatDate(employee.nciiExpiryDate)}</div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div className="bg-gray-800 text-white font-bold text-center py-1 mb-2 text-xs uppercase">
+                    EXAMS TAKEN
+                </div>
+                <div className="mb-4 text-[10px]">
+                    <table className="w-full border-collapse border border-black text-center">
+                        <thead>
+                            <tr className="bg-gray-100">
+                                <th className="border border-black p-1 w-[25%]">Name of Examination</th>
+                                <th className="border border-black p-1 w-[20%]">Provider / Org</th>
+                                <th className="border border-black p-1 w-[15%]">Date Taken</th>
+                                <th className="border border-black p-1 w-[15%]">Location / Mode</th>
+                                <th className="border border-black p-1 w-[15%]">Score / %</th>
+                                <th className="border border-black p-1 w-[10%]">Attach.</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {(employee.examsTaken || [{}, {}]).map((exam, idx) => (
+                                <tr key={idx}>
+                                    <td className="border border-black p-1 h-6 text-left">{exam.name || ''}</td>
+                                    <td className="border border-black p-1 h-6">{exam.provider || ''}</td>
+                                    <td className="border border-black p-1 h-6">{formatDate(exam.date)}</td>
+                                    <td className="border border-black p-1 h-6">{exam.location || ''}</td>
+                                    <td className="border border-black p-1 h-6">{exam.rating || ''}</td>
+                                    <td className="border border-black p-1 h-6">{exam.attachment ? 'Yes' : 'No'}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
 
                 <div className="bg-gray-800 text-white font-bold text-center py-1 mb-2 text-xs uppercase">
@@ -562,10 +599,6 @@ const PrintableProfileView = ({ employee, onClose }) => {
                     <p className="mb-2">
                         As part of our procedure for processing your employment application, your personal and employment references may be checked. If you have misrepresented or omitted any facts on this application, and are subsequently hired, you may be discharged from your job. You may make a written request for information derived from the checking of your references.
                     </p>
-                    <p className="mb-0">
-                        If necessary for employment, you may be required to: supply your birth certificate or other proof of authorization to work in the EDP Engineering Services, have a physical examination and/or a drug test, or sign a conflict-of-interest agreement and abide by its terms. I understand and agree with the information shown above.
-                    </p>
-
                     <div className="flex justify-between items-end">
                         <div className="flex-1 mr-8">
                             {/* Signature Area */}

@@ -91,14 +91,14 @@ const Login = ({ onLogin }) => {
                 }
 
                 .login-logo-ring {
-                    width: 100px;
-                    height: 100px;
+                    width: 140px;
+                    height: 140px;
                     border-radius: 50%;
-                    border: 3px solid #f1f5f9;
+                    border: 4px solid #f1f5f9;
                     overflow: hidden;
-                    box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
                     background: #fff;
-                    margin: 0 auto 1.5rem auto;
+                    margin: 0 auto 2rem auto;
                 }
 
                 .login-logo-ring img {

@@ -205,6 +205,12 @@ const INITIAL_FORM_DATA = {
   ],
   hasNCII: '',
   specializedTraining: '',
+  nciiRenewedDate: '',
+  nciiExpiryDate: '',
+  examsTaken: [
+    { name: '', provider: '', date: '', location: '', rating: '', attachment: null },
+    { name: '', provider: '', date: '', location: '', rating: '', attachment: null }
+  ],
   otherQualifications: '',
   computerEquipment: '',
   professionalLicenses: '',
@@ -925,6 +931,9 @@ const EmployeeDashboard = ({ user, onLogout }) => {
         shift_type_label: formData.shiftTypeLabel || '',
         has_ncii: formData.hasNCII === 'Yes',
         specialized_training: formData.specializedTraining || '',
+        ncii_renewed_date: formData.nciiRenewedDate || null,
+        ncii_expiry_date: formData.nciiExpiryDate || null,
+        exams_taken: formData.examsTaken.filter(exam => exam.name?.trim() || exam.provider?.trim()) || [],
         other_qualifications: formData.otherQualifications || '',
         computer_equipment: formData.computerEquipment || '',
         professional_licenses: formData.professionalLicenses || '',
@@ -1221,6 +1230,16 @@ const EmployeeDashboard = ({ user, onLogout }) => {
       shiftTypeLabel: employee.shift_type_label || '',
       hasNCII: employee.has_ncii ? 'Yes' : 'No',
       specializedTraining: employee.specialized_training || '',
+      nciiRenewedDate: employee.ncii_renewed_date || '',
+      nciiExpiryDate: employee.ncii_expiry_date || '',
+      examsTaken: (() => {
+        const loaded = Array.isArray(employee.exams_taken) ? employee.exams_taken : [];
+        const normalized = [...loaded];
+        while (normalized.length < 2) {
+          normalized.push({ name: '', provider: '', date: '', location: '', rating: '', attachment: null });
+        }
+        return normalized;
+      })(),
       otherQualifications: employee.other_qualifications || '',
       computerEquipment: employee.computer_equipment || '',
       professionalLicenses: employee.professional_licenses || '',
@@ -1417,6 +1436,33 @@ const EmployeeDashboard = ({ user, onLogout }) => {
       newEducation[index] = { ...newEducation[index], [field]: value };
       return { ...prev, education: newEducation };
     });
+  };
+
+  const handleExamChange = (index, field, value) => {
+    setFormData(prev => {
+      const newExams = [...prev.examsTaken];
+      newExams[index] = { ...newExams[index], [field]: value };
+      return { ...prev, examsTaken: newExams };
+    });
+  };
+
+  const handleExamAttachmentUpload = (index, e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) { // 2MB limit
+        alert('File size exceeds 2MB. Please choose a smaller file.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => {
+          const newExams = [...prev.examsTaken];
+          newExams[index] = { ...newExams[index], attachment: reader.result };
+          return { ...prev, examsTaken: newExams };
+        });
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleShiftChange = (shift) => {
@@ -3440,7 +3486,7 @@ const EmployeeDashboard = ({ user, onLogout }) => {
                                   <input
                                     type="checkbox"
                                     checked={formData.hasNCII === 'No'}
-                                    onChange={() => setFormData({ ...formData, hasNCII: 'No', specializedTraining: '' })}
+                                    onChange={() => setFormData({ ...formData, hasNCII: 'No', specializedTraining: '', nciiRenewedDate: '', nciiExpiryDate: '' })}
                                     className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500 transition-all group-hover:border-indigo-400 bg-white dark:bg-slate-800"
                                   />
                                   <span className="text-sm text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-200 transition-colors">No</span>
@@ -3449,23 +3495,158 @@ const EmployeeDashboard = ({ user, onLogout }) => {
                             </div>
 
                             {formData.hasNCII === 'Yes' && (
-                              <div className="flex items-center gap-2 ml-4 transition-all duration-300">
-                                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">Duty/specialized training:</label>
-                                <input
-                                  type="text"
-                                  value={formData.specializedTraining}
-                                  onChange={(e) => setFormData({ ...formData, specializedTraining: e.target.value })}
-                                  className="flex-1 px-4 py-2 border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl focus:border-indigo-400 focus:outline-none text-slate-800 dark:text-white text-sm"
-                                  disabled={isViewOnly}
-                                  placeholder="Enter specialized training details..."
-                                />
+                              <div className="space-y-4 ml-4 transition-all duration-300">
+                                <div className="flex items-center gap-2">
+                                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">Duty/specialized training:</label>
+                                  <input
+                                    type="text"
+                                    value={formData.specializedTraining}
+                                    onChange={(e) => setFormData({ ...formData, specializedTraining: e.target.value })}
+                                    className="flex-1 px-4 py-2 border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl focus:border-indigo-400 focus:outline-none text-slate-800 dark:text-white text-sm"
+                                    disabled={isViewOnly}
+                                    placeholder="Enter specialized training details..."
+                                  />
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="flex items-center gap-2">
+                                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">Renewed Date:</label>
+                                    <input
+                                      type="date"
+                                      value={formData.nciiRenewedDate}
+                                      onChange={(e) => setFormData({ ...formData, nciiRenewedDate: e.target.value })}
+                                      className="flex-1 px-4 py-2 border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl focus:border-indigo-400 focus:outline-none text-slate-800 dark:text-white text-sm"
+                                      disabled={isViewOnly}
+                                    />
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">Expiry Date:</label>
+                                    <input
+                                      type="date"
+                                      value={formData.nciiExpiryDate}
+                                      onChange={(e) => setFormData({ ...formData, nciiExpiryDate: e.target.value })}
+                                      className="flex-1 px-4 py-2 border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl focus:border-indigo-400 focus:outline-none text-slate-800 dark:text-white text-sm"
+                                      disabled={isViewOnly}
+                                    />
+                                  </div>
+                                </div>
                               </div>
                             )}
                           </div>
                         </div>
 
                         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border-2 border-slate-200 dark:border-slate-700">
-                          <h3 className="text-base font-bold text-slate-800 dark:text-white mb-6 text-center">SKILLS & QUALIFICATIONS</h3>
+                          <h3 className="text-base font-bold text-slate-800 dark:text-white mb-6 text-center uppercase tracking-wider">Exams Taken</h3>
+                          <div className="overflow-hidden border-2 border-slate-200 dark:border-slate-700 rounded-xl shadow-sm">
+                            <table className="w-full border-collapse">
+                              <thead>
+                                <tr className="bg-gradient-to-r from-slate-50 to-indigo-50 dark:from-slate-800 dark:to-indigo-900/20 border-b-2 border-indigo-100 dark:border-slate-700">
+                                  <th className="text-left py-3 px-4 text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider border-r-2 border-slate-200 dark:border-slate-700">Name of Examination</th>
+                                  <th className="text-left py-3 px-4 text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider border-r-2 border-slate-200 dark:border-slate-700">Exam Provider / Org.</th>
+                                  <th className="text-left py-3 px-4 text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider border-r-2 border-slate-200 dark:border-slate-700">Date Taken</th>
+                                  <th className="text-left py-3 px-4 text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider border-r-2 border-slate-200 dark:border-slate-700">Location / Mode</th>
+                                  <th className="text-left py-3 px-4 text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider border-r-2 border-slate-200 dark:border-slate-700">Score/ Percentage</th>
+                                  <th className="text-left py-3 px-4 text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Attachment</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {formData.examsTaken.map((exam, index) => (
+                                  <tr key={index} className={index !== formData.examsTaken.length - 1 ? "border-b-2 border-slate-200 dark:border-slate-700 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors" : "hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors"}>
+                                    <td className="p-2 border-r-2 border-slate-200 dark:border-slate-700">
+                                      <input
+                                        type="text"
+                                        value={exam.name}
+                                        onChange={(e) => handleExamChange(index, 'name', e.target.value)}
+                                        className="w-full bg-transparent focus:outline-none dark:text-white text-sm px-2 py-1"
+                                        disabled={isViewOnly}
+                                        placeholder="Exam Name"
+                                      />
+                                    </td>
+                                    <td className="p-2 border-r-2 border-slate-200 dark:border-slate-700">
+                                      <input
+                                        type="text"
+                                        value={exam.provider}
+                                        onChange={(e) => handleExamChange(index, 'provider', e.target.value)}
+                                        className="w-full bg-transparent focus:outline-none dark:text-white text-sm px-2 py-1"
+                                        disabled={isViewOnly}
+                                        placeholder="TESDA, PRC, etc."
+                                      />
+                                    </td>
+                                    <td className="p-2 border-r-2 border-slate-200 dark:border-slate-700">
+                                      <input
+                                        type="date"
+                                        value={exam.date}
+                                        onChange={(e) => handleExamChange(index, 'date', e.target.value)}
+                                        className="w-full bg-transparent focus:outline-none dark:text-white text-sm px-2 py-1"
+                                        disabled={isViewOnly}
+                                      />
+                                    </td>
+                                    <td className="p-2 border-r-2 border-slate-200 dark:border-slate-700">
+                                      <input
+                                        type="text"
+                                        value={exam.location}
+                                        onChange={(e) => handleExamChange(index, 'location', e.target.value)}
+                                        className="w-full bg-transparent focus:outline-none dark:text-white text-sm px-2 py-1"
+                                        disabled={isViewOnly}
+                                        placeholder="Online/On-site"
+                                      />
+                                    </td>
+                                    <td className="p-2 border-r-2 border-slate-200 dark:border-slate-700">
+                                      <input
+                                        type="text"
+                                        value={exam.rating}
+                                        onChange={(e) => handleExamChange(index, 'rating', e.target.value)}
+                                        className="w-full bg-transparent focus:outline-none dark:text-white text-sm px-2 py-1"
+                                        disabled={isViewOnly}
+                                        placeholder="..."
+                                      />
+                                    </td>
+                                    <td className="p-2">
+                                      <div className="flex items-center gap-2">
+                                        <label className="cursor-pointer group/upload">
+                                          <input
+                                            type="file"
+                                            className="hidden"
+                                            onChange={(e) => handleExamAttachmentUpload(index, e)}
+                                            accept="image/*"
+                                            disabled={isViewOnly}
+                                          />
+                                          <div className={`p-1.5 rounded-lg transition-all ${exam.attachment ? 'bg-green-100 text-green-600' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-indigo-100 hover:text-indigo-600'}`}>
+                                            <Camera className="w-4 h-4" />
+                                          </div>
+                                        </label>
+                                        {exam.attachment && (
+                                          <>
+                                            <button
+                                              type="button"
+                                              onClick={() => setExpandedImage(exam.attachment)}
+                                              className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 transition-all"
+                                              title="View Attachment"
+                                            >
+                                              <Eye className="w-4 h-4" />
+                                            </button>
+                                            {!isViewOnly && (
+                                              <button
+                                                type="button"
+                                                onClick={() => handleExamChange(index, 'attachment', null)}
+                                                className="p-1.5 rounded-lg bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 hover:bg-rose-100 transition-all"
+                                                title="Remove Attachment"
+                                              >
+                                                <Trash2 className="w-4 h-4" />
+                                              </button>
+                                            )}
+                                          </>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border-2 border-slate-200 dark:border-slate-700">
+                          <h3 className="text-base font-bold text-slate-800 dark:text-white mb-6 text-center uppercase tracking-wider">SKILLS & QUALIFICATIONS</h3>
 
                           <div className="space-y-4">
                             <div>
@@ -4712,6 +4893,7 @@ const EmployeeDashboard = ({ user, onLogout }) => {
               onClick={() => setExpandedImage(null)}
             >
               <button
+                type="button"
                 className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
                 onClick={(e) => {
                   e.stopPropagation();
